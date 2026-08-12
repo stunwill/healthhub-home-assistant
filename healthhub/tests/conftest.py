@@ -7,3 +7,4 @@ import os
 # imported by another test module.
 os.environ.setdefault("HEALTHHUB_DATABASE_URL", "sqlite:///./test-healthhub.db")
 os.environ.setdefault("HEALTHHUB_ACTIVE_PROFILE_FILE", "./test-active-profile.json")
+os.environ.setdefault("HEALTHHUB_CAPTURE_DIR", "./test-captures")

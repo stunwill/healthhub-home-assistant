@@ -8,6 +8,7 @@ htmlcov/
 .venv/
 healthhub/*.db
 healthhub/test-*.json
+healthhub/test-captures/
 healthhub/frontend/node_modules/
 healthhub/frontend/dist/
 .DS_Store

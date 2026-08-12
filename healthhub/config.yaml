@@ -1,5 +1,5 @@
 name: HealthHub
-version: "0.1.0"
+version: "0.2.0"
 slug: healthhub
 description: Personal nutrition, activity, goals and progress tracking for Home Assistant with FoodHub integration.
 url: https://github.com/stunwill/healthhub-home-assistant
@@ -11,7 +11,8 @@ ingress: true
 panel_icon: mdi:heart-pulse
 panel_title: HealthHub
 map:
-  - addon_config:rw
+  - type: addon_config
+    read_only: false
 options:
   locale: en-AU
   timezone: Australia/Melbourne

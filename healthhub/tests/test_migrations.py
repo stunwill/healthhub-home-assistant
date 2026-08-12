@@ -5,7 +5,7 @@ from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
 
-def test_initial_migration_creates_profiles(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_migrations_create_current_schema(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     database = tmp_path / "migration.db"
     monkeypatch.delenv("HEALTHHUB_DATABASE_URL", raising=False)
 
@@ -14,4 +14,7 @@ def test_initial_migration_creates_profiles(tmp_path: Path, monkeypatch) -> None
     command.upgrade(config, "head")
 
     engine = create_engine(f"sqlite:///{database}")
-    assert "profiles" in inspect(engine).get_table_names()
+    tables = inspect(engine).get_table_names()
+    assert "profiles" in tables
+    assert "foods" in tables
+    assert "diary_entries" in tables
