@@ -5,7 +5,13 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .models import ExerciseCreditMode, MeasurementUnits, NutritionDisplayMode
+from .models import (
+    ExerciseCreditMode,
+    FoodKind,
+    MealPeriod,
+    MeasurementUnits,
+    NutritionDisplayMode,
+)
 
 
 class ProfileBase(BaseModel):
@@ -104,3 +110,125 @@ class CalorieBudgetInput(BaseModel):
 class CalorieBudgetOutput(BaseModel):
     credited_exercise_calories: int
     remaining_calories: int
+
+
+class FoodBase(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    brand: str | None = Field(default=None, max_length=120)
+    kind: FoodKind = FoodKind.FOOD
+    serving_name: str = Field(default="1 serve", min_length=1, max_length=100)
+    serving_grams: float | None = Field(default=None, gt=0, le=10000)
+    energy_kj: float | None = Field(default=None, ge=0, le=100000)
+    calories: float = Field(ge=0, le=25000)
+    protein_g: float | None = Field(default=None, ge=0, le=5000)
+    carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
+    fat_g: float | None = Field(default=None, ge=0, le=5000)
+    favourite: bool = False
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class FoodCreate(FoodBase):
+    source: str = Field(default="manual", min_length=1, max_length=40)
+
+
+class FoodUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=180)
+    brand: str | None = Field(default=None, max_length=120)
+    kind: FoodKind | None = None
+    serving_name: str | None = Field(default=None, min_length=1, max_length=100)
+    serving_grams: float | None = Field(default=None, gt=0, le=10000)
+    energy_kj: float | None = Field(default=None, ge=0, le=100000)
+    calories: float | None = Field(default=None, ge=0, le=25000)
+    protein_g: float | None = Field(default=None, ge=0, le=5000)
+    carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
+    fat_g: float | None = Field(default=None, ge=0, le=5000)
+    favourite: bool | None = None
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class FoodOutput(FoodBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source: str
+    archived: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class DiaryEntryCreate(BaseModel):
+    food_id: str
+    meal_period: MealPeriod = MealPeriod.SNACK
+    consumed_at: datetime
+    servings: float = Field(default=1.0, gt=0, le=100)
+
+    @field_validator("consumed_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("consumed_at must include a timezone")
+        return value
+
+
+class DiaryEntryOutput(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    profile_id: str
+    food_id: str | None
+    meal_period: MealPeriod
+    consumed_at: datetime
+    servings: float
+    food_name: str
+    serving_name: str
+    calories: float
+    protein_g: float | None
+    carbohydrates_g: float | None
+    fat_g: float | None
+    source: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class DailySummaryOutput(BaseModel):
+    profile_id: str
+    date: date
+    calorie_target: int
+    consumed_calories: int
+    credited_exercise_calories: int
+    remaining_calories: int
+    protein_g: float
+    carbohydrates_g: float
+    fat_g: float
+    entry_count: int
+
+
+class QuickAddResult(BaseModel):
+    id: str
+    source: str
+    result_type: str
+    name: str
+    subtitle: str | None = None
+    calories: float | None = None
+    nutrition_complete: bool = False
+
+
+class NutritionLabelReviewCreate(BaseModel):
+    upload_id: str
+    name: str = Field(min_length=1, max_length=180)
+    brand: str | None = Field(default=None, max_length=120)
+    kind: FoodKind = FoodKind.FOOD
+    serving_name: str = Field(min_length=1, max_length=100)
+    serving_grams: float | None = Field(default=None, gt=0, le=10000)
+    energy_kj: float | None = Field(default=None, ge=0, le=100000)
+    calories: float = Field(ge=0, le=25000)
+    protein_g: float | None = Field(default=None, ge=0, le=5000)
+    carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
+    fat_g: float | None = Field(default=None, ge=0, le=5000)
+    reviewed: bool
+
+    @model_validator(mode="after")
+    def require_review(self) -> "NutritionLabelReviewCreate":
+        if not self.reviewed:
+            raise ValueError("Nutrition label values must be reviewed before saving")
+        return self
