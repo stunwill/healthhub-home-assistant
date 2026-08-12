@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import ProgressView from './ProgressView'
+import WeekView from './WeekView'
 
 type Profile = {
   id: string
@@ -275,6 +276,7 @@ export default function App() {
             : entries.map((entry) => <article className="diary-row" key={entry.id}><div><span className="meal-tag">{entry.meal_period}</span><strong>{entry.food_name}</strong><small>{entry.servings} × {entry.serving_name}</small></div><div className="diary-energy"><strong>{Math.round(entry.calories)} kcal</strong><button aria-label={`Remove ${entry.food_name}`} onClick={() => void deleteEntry(entry.id)}>Remove</button></div></article>)}
           </section>
         </section>
+        : view === 'week' && activeProfileId ? <WeekView profileId={activeProfileId} onNotice={setNotice} />
         : view === 'progress' && activeProfileId ? <ProgressView profileId={activeProfileId} onNotice={setNotice} onActivityChanged={() => loadToday(activeProfileId)} />
         : view === 'settings' ? <section><p className="eyebrow">Settings</p><h1>Foods & preferences</h1><p>Add foods from Australian packaging or other trusted sources. Values are stored per serving and can be edited later through the API.</p>
           <div className="food-form">
@@ -289,7 +291,7 @@ export default function App() {
             <label>Fat (g)<input inputMode="decimal" value={foodDraft.fat_g} onChange={(e) => setFoodDraft({ ...foodDraft, fat_g: e.target.value })} /></label>
           </div><button className="quick-add" disabled={savingFood} onClick={() => void saveFood()}>{savingFood ? 'Saving…' : 'Save food'}</button>
         </section>
-        : <section className="empty-card"><h1>Week</h1><p>Weekly planning remains reserved for a later HealthHub release.</p></section>}
+        : <section className="empty-card"><h1>Select a profile</h1><p>Choose a profile to use HealthHub.</p></section>}
       </main>
 
       <nav className="bottom-nav" aria-label="Primary navigation"><button onClick={() => setView('today')} aria-current={view === 'today' ? 'page' : undefined}>Today</button><button onClick={() => setView('week')} aria-current={view === 'week' ? 'page' : undefined}>Week</button><button onClick={() => setView('progress')} aria-current={view === 'progress' ? 'page' : undefined}>Progress</button><button onClick={() => setView('settings')} aria-current={view === 'settings' ? 'page' : undefined}>Settings</button></nav>
