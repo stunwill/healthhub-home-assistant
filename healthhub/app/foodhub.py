@@ -13,6 +13,15 @@ class FoodHubStatus:
     message: str | None = None
 
 
+@dataclass(frozen=True)
+class FoodHubRecipeResult:
+    id: str
+    name: str
+    image_url: str | None
+    nutrition_available: bool
+    calories_per_serving: float | None
+
+
 class FoodHubClient:
     def __init__(self, base_url: str, timeout_seconds: float = 2.0) -> None:
         self.base_url = base_url.rstrip("/")
@@ -35,3 +44,31 @@ class FoodHubClient:
             version=payload.get("application_version"),
             message=None if compatible else "FoodHub is reachable but does not advertise API v1",
         )
+
+    async def search_recipes(self, query: str, limit: int = 8) -> list[FoodHubRecipeResult]:
+        try:
+            async with httpx.AsyncClient(timeout=self.timeout) as client:
+                response = await client.get(
+                    f"{self.base_url}/api/v1/recipes/search",
+                    params={"q": query, "limit": limit},
+                )
+                if response.status_code in {404, 405}:
+                    return []
+                response.raise_for_status()
+                payload = response.json()
+        except (httpx.HTTPError, ValueError):
+            return []
+
+        results: list[FoodHubRecipeResult] = []
+        for item in payload if isinstance(payload, list) else []:
+            nutrition = item.get("nutrition") or {}
+            results.append(
+                FoodHubRecipeResult(
+                    id=str(item.get("id")),
+                    name=str(item.get("name", "FoodHub recipe")),
+                    image_url=item.get("image_url"),
+                    nutrition_available=bool(nutrition.get("available", False)),
+                    calories_per_serving=nutrition.get("calories_per_serving"),
+                )
+            )
+        return results
