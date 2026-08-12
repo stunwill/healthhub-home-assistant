@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.2.0 - Daily Diary & Food Core
+
+### Added
+
+- Added a persistent HealthHub food catalogue with stable IDs, foods/drinks, brand, serving size, Australian energy in kJ, calories and optional protein, carbohydrate and fat values.
+- Added profile-scoped consumed diary entries with meal periods, timezone-aware timestamps and immutable nutrition snapshots so later food edits do not rewrite diary history.
+- Added daily calorie and macro summaries using the profile calorie target and existing exercise-credit calculation domain service.
+- Added predictive Quick Add search across HealthHub foods, with a versioned FoodHub recipe-search adapter that degrades cleanly until the FoodHub search capability is available.
+- Added a functional mobile-first Today diary with consumed, remaining and target calories, protein totals, entry removal and Quick Add logging.
+- Added manual food creation using Australian nutrition-label conventions.
+- Added phone camera/existing-image nutrition-label upload for JPEG, PNG and WebP files up to 10 MB.
+- Added a mandatory review endpoint for nutrition-label values before a captured label can become a saved food.
+- Added v0.2 Alembic migration coverage and API tests for food search, diary logging, daily summaries, archiving and nutrition-label review.
+
+### Changed
+
+- HealthHub now uses the current Home Assistant `app_config` mapping instead of the legacy `addon_config` map type.
+- Container/runtime version handling now preserves the build version rather than resetting it from an unavailable runtime build argument.
+
+### Deliberately deferred
+
+- OCR/AI nutrition-label extraction. v0.2 stores the image and requires manual review/entry; it does not fabricate extracted values.
+- Barcode lookup and external commercial nutrition APIs.
+- FoodHub recipe logging where authoritative per-serving nutrition is unavailable.
+- Exercise diary, weight tracking, weekly planning, recurrence, progress charts and wearable imports.
+
 ## 0.1.0 - Foundation & Profiles
 
 ### Added
