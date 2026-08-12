@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import ProgressView from './ProgressView'
 
 type Profile = {
   id: string
@@ -30,7 +31,10 @@ type DiaryEntry = {
 type DailySummary = {
   calorie_target: number
   consumed_calories: number
+  completed_exercise_calories?: number
+  credited_exercise_calories?: number
   remaining_calories: number
+  exercise_minutes?: number
   protein_g: number
   carbohydrates_g: number
   fat_g: number
@@ -261,15 +265,17 @@ export default function App() {
           {activeProfile && summary ? <div className="target-grid">
             <article className="target-card"><span>Remaining</span><strong>{summary.remaining_calories.toLocaleString('en-AU')} kcal</strong></article>
             <article className="target-card"><span>Consumed</span><strong>{summary.consumed_calories.toLocaleString('en-AU')} kcal</strong></article>
+            <article className="target-card"><span>Exercise credit</span><strong>+{(summary.credited_exercise_calories ?? 0).toLocaleString('en-AU')} kcal</strong></article>
             <article className="target-card"><span>Daily target</span><strong>{summary.calorie_target.toLocaleString('en-AU')} kcal</strong></article>
-            <article className="target-card"><span>Protein</span><strong>{summary.protein_g.toFixed(1)} g</strong></article>
           </div> : null}
+          {(summary?.exercise_minutes ?? 0) > 0 && <p className="activity-note">Today: {summary?.exercise_minutes ?? 0} exercise min, {summary?.completed_exercise_calories ?? 0} kcal completed before credit settings.</p>}
           <section className="diary-list">
             <div className="section-heading"><h2>Food diary</h2><span>{summary?.entry_count ?? 0} items</span></div>
             {entries.length === 0 ? <article className="empty-card"><h2>Nothing logged yet</h2><p>Use Quick Add to search your HealthHub foods and available FoodHub recipes.</p></article>
             : entries.map((entry) => <article className="diary-row" key={entry.id}><div><span className="meal-tag">{entry.meal_period}</span><strong>{entry.food_name}</strong><small>{entry.servings} × {entry.serving_name}</small></div><div className="diary-energy"><strong>{Math.round(entry.calories)} kcal</strong><button aria-label={`Remove ${entry.food_name}`} onClick={() => void deleteEntry(entry.id)}>Remove</button></div></article>)}
           </section>
         </section>
+        : view === 'progress' && activeProfileId ? <ProgressView profileId={activeProfileId} onNotice={setNotice} onActivityChanged={() => loadToday(activeProfileId)} />
         : view === 'settings' ? <section><p className="eyebrow">Settings</p><h1>Foods & preferences</h1><p>Add foods from Australian packaging or other trusted sources. Values are stored per serving and can be edited later through the API.</p>
           <div className="food-form">
             <label>Name<input value={foodDraft.name} onChange={(e) => setFoodDraft({ ...foodDraft, name: e.target.value })} /></label>
@@ -283,7 +289,7 @@ export default function App() {
             <label>Fat (g)<input inputMode="decimal" value={foodDraft.fat_g} onChange={(e) => setFoodDraft({ ...foodDraft, fat_g: e.target.value })} /></label>
           </div><button className="quick-add" disabled={savingFood} onClick={() => void saveFood()}>{savingFood ? 'Saving…' : 'Save food'}</button>
         </section>
-        : <section className="empty-card"><h1>{view === 'week' ? 'Week' : 'Progress'}</h1><p>This area remains reserved for a later HealthHub release. No fake totals or analytics are shown.</p></section>}
+        : <section className="empty-card"><h1>Week</h1><p>Weekly planning remains reserved for a later HealthHub release.</p></section>}
       </main>
 
       <nav className="bottom-nav" aria-label="Primary navigation"><button onClick={() => setView('today')} aria-current={view === 'today' ? 'page' : undefined}>Today</button><button onClick={() => setView('week')} aria-current={view === 'week' ? 'page' : undefined}>Week</button><button onClick={() => setView('progress')} aria-current={view === 'progress' ? 'page' : undefined}>Progress</button><button onClick={() => setView('settings')} aria-current={view === 'settings' ? 'page' : undefined}>Settings</button></nav>
@@ -294,7 +300,7 @@ export default function App() {
         {searching && <p>Searching…</p>}
         <div className="search-results">{searchResults.map((result) => <button key={`${result.source}-${result.id}`} className="search-result" onClick={() => void addSearchResult(result)}><span><strong>{result.name}</strong><small>{result.subtitle} · {result.source === 'foodhub' ? 'FoodHub' : 'HealthHub'}</small></span><b>{result.calories == null ? 'Nutrition pending' : `${Math.round(result.calories)} kcal`}</b></button>)}</div>
         {search.trim().length >= 2 && !searching && searchResults.length === 0 && <p>No matching foods yet. Add a food in Settings.</p>}
-        <div className="secondary-actions"><label className="upload-action">Nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadLabel(file) }} /></label><button disabled>Scan barcode</button><button disabled>Photograph meal</button><button disabled>Quick calories</button><button disabled>Exercise</button><button disabled>Weight</button><button disabled>Water</button></div>
+        <div className="secondary-actions"><label className="upload-action">Nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadLabel(file) }} /></label><button disabled>Scan barcode</button><button disabled>Photograph meal</button><button disabled>Quick calories</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Exercise</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Weight</button><button disabled>Water</button></div>
         <button onClick={() => setQuickAddOpen(false)}>Close</button></section></div>}
     </div>
   )

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from fastapi.testclient import TestClient
 
@@ -57,6 +58,7 @@ def create_food() -> str:
 def test_food_search_and_diary_summary() -> None:
     profile_id = create_profile()
     food_id = create_food()
+    profile_day = datetime.now(ZoneInfo("Australia/Melbourne")).date().isoformat()
 
     search = client.get("/api/v1/quick-add/search", params={"q": "yoghurt"})
     assert search.status_code == 200
@@ -77,7 +79,10 @@ def test_food_search_and_diary_summary() -> None:
     assert logged.json()["calories"] == 150
     assert logged.json()["protein_g"] == 18
 
-    summary = client.get(f"/api/v1/profiles/{profile_id}/daily-summary")
+    summary = client.get(
+        f"/api/v1/profiles/{profile_id}/daily-summary",
+        params={"day": profile_day},
+    )
     assert summary.status_code == 200
     assert summary.json()["consumed_calories"] == 150
     assert summary.json()["remaining_calories"] == 1650
