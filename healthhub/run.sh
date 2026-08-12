@@ -4,6 +4,7 @@ set -euo pipefail
 export HEALTHHUB_VERSION="${BUILD_VERSION:-0.1.0}"
 export HEALTHHUB_ENFORCE_INGRESS="true"
 export HEALTHHUB_DATA_DIR="/data/healthhub"
+export PYTHONPATH="/app${PYTHONPATH:+:${PYTHONPATH}}"
 
 mkdir -p /data/healthhub
 cd /app
