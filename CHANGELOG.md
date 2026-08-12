@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0 - Planning & Recurrence
+
+### Added
+
+- Added profile-scoped planned food entries with immutable nutrition snapshots, meal period, servings and timezone-aware planned times.
+- Added a functional Week view with previous/next week navigation, daily planned-versus-consumed calorie totals and planned item status.
+- Added actions to mark a planned item consumed, skip it, or remove an unconsumed plan.
+- Marking a planned item consumed creates a real diary entry using the planned nutrition snapshot, it does not silently alter the underlying food definition.
+- Added simple recurrence rules for daily, weekdays and weekly patterns, materialised for an eight-week planning horizon.
+- Added weekly plan summary and recurrence management endpoints under `/api/v1`.
+- Added Alembic migration `0004_planning_recurrence` and backend tests covering plan, consume, skip, recurrence, weekly totals, validation and migrations.
+
+### Behaviour and boundaries
+
+- Planning remains profile-specific HealthHub data and does not modify FoodHub schedules.
+- FoodHub recipes are not treated as consumable HealthHub nutrition unless authoritative per-serving nutrition is available through the versioned integration contract.
+- Recurrence creates planned entries only. It never marks food as consumed automatically.
+- Home Assistant remains the trust boundary, no HealthHub authentication has been added.
+
+### Deferred
+
+- Drag-and-drop planning and an unscheduled meal tray.
+- Water logging.
+- Richer weight charts and trend analytics.
+- Barcode lookup, functional OCR/AI extraction, wearables and smart scales.
+
 ## 0.3.0 - Exercise, Weight & Progress
 
 ### Added
