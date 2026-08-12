@@ -49,4 +49,24 @@ h1, h2, p { margin-top: 0; }
 .upload-action input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .food-form { display: grid; gap: 12px; margin: 18px 0; }
 .food-form label { display: grid; gap: 6px; color: #526a60; font-size: .82rem; font-weight: 600; }
-@media (min-width: 760px) { .content { padding: 32px; } .target-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } .quick-sheet { width: min(620px, calc(100% - 48px)); margin: auto; border-radius: 24px; } .sheet-backdrop { align-items: center; } .food-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.week-controls { display: flex; gap: 8px; }
+.week-controls button { background: #e6f1ec; color: #15553f; }
+.week-summary { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; margin-bottom: 16px; }
+.week-grid { display: grid; gap: 12px; }
+.week-day, .planner-card { background: white; border: 1px solid #dbe7e1; border-radius: 18px; padding: 16px; box-shadow: 0 8px 24px rgba(26,64,51,.05); }
+.week-day-heading { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; margin-bottom: 10px; }
+.week-day-heading span, .muted { color: #687a73; font-size: .82rem; }
+.planned-row { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid #edf3f0; }
+.planned-row > div:first-child { display: grid; gap: 4px; }
+.planned-row small { color: #687a73; }
+.planned-actions { display: flex; gap: 6px; align-items: center; }
+.planned-actions button { min-height: 34px; padding: 0 10px; background: #eef4f1; color: #31564a; }
+.status-consumed { opacity: .68; }
+.status-skipped { opacity: .55; text-decoration: line-through; }
+.status-label { align-self: center; text-transform: capitalize; font-size: .8rem; color: #687a73; }
+.planner-card { margin-top: 18px; }
+.planner-card > input { width: 100%; min-height: 48px; border: 1px solid #c8d8d0; border-radius: 14px; padding: 0 14px; margin-bottom: 10px; }
+.planner-fields { display: grid; gap: 10px; margin: 12px 0; }
+.planner-fields label { display: grid; gap: 5px; font-size: .8rem; font-weight: 600; color: #526a60; }
+.planner-fields input, .planner-fields select { min-height: 44px; border: 1px solid #c8d8d0; border-radius: 12px; padding: 0 10px; background: white; color: #17352c; }
+@media (min-width: 760px) { .content { padding: 32px; } .target-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } .quick-sheet { width: min(620px, calc(100% - 48px)); margin: auto; border-radius: 24px; } .sheet-backdrop { align-items: center; } .food-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .week-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .planner-fields { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
