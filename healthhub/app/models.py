@@ -4,8 +4,8 @@ from datetime import date, datetime, timezone
 from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Float, Integer, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 
@@ -30,6 +30,19 @@ class MeasurementUnits(StrEnum):
     METRIC = "metric"
 
 
+class FoodKind(StrEnum):
+    FOOD = "food"
+    DRINK = "drink"
+
+
+class MealPeriod(StrEnum):
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+    SNACK = "snack"
+    DRINK = "drink"
+
+
 class Profile(Base):
     __tablename__ = "profiles"
 
@@ -52,3 +65,60 @@ class Profile(Base):
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    diary_entries: Mapped[list[DiaryEntry]] = relationship(back_populates="profile", cascade="all, delete-orphan")
+
+
+class Food(Base):
+    __tablename__ = "foods"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    name: Mapped[str] = mapped_column(String(180), index=True)
+    brand: Mapped[str | None] = mapped_column(String(120), index=True)
+    kind: Mapped[str] = mapped_column(String(20), default=FoodKind.FOOD.value, index=True)
+    serving_name: Mapped[str] = mapped_column(String(100), default="1 serve")
+    serving_grams: Mapped[float | None] = mapped_column(Float)
+    energy_kj: Mapped[float | None] = mapped_column(Float)
+    calories: Mapped[float] = mapped_column(Float)
+    protein_g: Mapped[float | None] = mapped_column(Float)
+    carbohydrates_g: Mapped[float | None] = mapped_column(Float)
+    fat_g: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(40), default="manual", index=True)
+    favourite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    diary_entries: Mapped[list[DiaryEntry]] = relationship(back_populates="food")
+
+    __table_args__ = (
+        Index("ix_foods_search", "archived", "name", "brand"),
+    )
+
+
+class DiaryEntry(Base):
+    __tablename__ = "diary_entries"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    profile_id: Mapped[str] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    food_id: Mapped[str | None] = mapped_column(ForeignKey("foods.id", ondelete="SET NULL"), index=True)
+    meal_period: Mapped[str] = mapped_column(String(20), default=MealPeriod.SNACK.value, index=True)
+    consumed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    servings: Mapped[float] = mapped_column(Float, default=1.0)
+    food_name: Mapped[str] = mapped_column(String(180))
+    serving_name: Mapped[str] = mapped_column(String(100))
+    calories: Mapped[float] = mapped_column(Float)
+    protein_g: Mapped[float | None] = mapped_column(Float)
+    carbohydrates_g: Mapped[float | None] = mapped_column(Float)
+    fat_g: Mapped[float | None] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(String(40), default="healthhub")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    profile: Mapped[Profile] = relationship(back_populates="diary_entries")
+    food: Mapped[Food | None] = relationship(back_populates="diary_entries")
+
+    __table_args__ = (
+        Index("ix_diary_profile_consumed", "profile_id", "consumed_at"),
+    )
