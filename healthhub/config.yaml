@@ -11,7 +11,8 @@ ingress: true
 panel_icon: mdi:heart-pulse
 panel_title: HealthHub
 map:
-  - app_config:rw
+  - type: addon_config
+    read_only: false
 options:
   locale: en-AU
   timezone: Australia/Melbourne
