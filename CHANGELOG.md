@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1 - Home Assistant Ingress Proxy Fix
+
+### Fixed
+
+- Removed HealthHub's custom runtime IP allow-list from the Home Assistant Ingress path. Uvicorn honours trusted proxy headers, so legitimate Ingress requests can present the browser's forwarded LAN address rather than the Supervisor proxy address. The old allow-list could therefore reject valid Home Assistant Web UI requests.
+- Home Assistant remains the trust boundary. HealthHub still does not publish its internal port externally by default and no application authentication has been added.
+- Added regression coverage ensuring the production runtime does not enable the conflicting custom Ingress IP filter and that a forwarded LAN client can reach the HealthHub health endpoint.
+
 ## 0.4.0 - Planning & Recurrence
 
 ### Added
