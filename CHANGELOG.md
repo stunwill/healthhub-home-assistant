@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0 - Exercise, Weight & Progress
+
+### Added
+
+- Added profile-scoped manual exercise entries with activity name, duration, calories burned, timezone-aware completion time and optional notes.
+- Added profile-scoped weight entries with metric kilograms and timezone-aware measurement time.
+- Added exercise-aware daily calorie summaries. Completed exercise calories now flow through the existing no-credit, full-credit or percentage-credit profile setting before affecting remaining calories.
+- Added a functional Progress screen for exercise logging, weight logging, recent weight history, goal context and exercise totals.
+- Added Quick Add shortcuts for Exercise and Weight that open the Progress workflow.
+- Added Alembic migration `0003_exercise_weight` and API/integration tests for exercise-credit behaviour, weight history, progress summaries and timestamp validation.
+
+### Safety and scope
+
+- HealthHub does not estimate exercise calories in v0.3.0. Users enter values from a trusted device or source.
+- Weight goals remain user-configured values. HealthHub does not prescribe a target or provide medical advice.
+- Home Assistant remains the trust boundary; no separate authentication has been introduced.
+
+### Deferred
+
+- Weekly meal planning, planned food entries and recurrence.
+- Water logging.
+- Weight charts and advanced trend analytics.
+- Barcode lookup, functional OCR/AI extraction, wearables and smart scales.
+
 ## 0.2.0 - Daily Diary & Food Core
 
 ### Added
@@ -16,8 +40,8 @@
 
 ### Changed
 
-- HealthHub now uses the current Home Assistant `app_config` mapping instead of the legacy `addon_config` map type.
-- Container/runtime version handling now preserves the build version rather than resetting it from an unavailable runtime build argument.
+- Home Assistant app configuration uses the supported structured `addon_config` mapping.
+- Container/runtime version handling preserves the build version rather than resetting it from an unavailable runtime build argument.
 
 ### Deliberately deferred
 
