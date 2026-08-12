@@ -1,8 +1,7 @@
 #!/usr/bin/with-contenv bashio
 set -euo pipefail
 
-export HEALTHHUB_VERSION="${HEALTHHUB_VERSION:-0.4.0}"
-export HEALTHHUB_ENFORCE_INGRESS="true"
+export HEALTHHUB_VERSION="${HEALTHHUB_VERSION:-0.4.1}"
 export HEALTHHUB_DATA_DIR="/data/healthhub"
 export PYTHONPATH="/app${PYTHONPATH:+:${PYTHONPATH}}"
 
