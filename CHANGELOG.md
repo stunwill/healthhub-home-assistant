@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.2 - Profile Onboarding Fix
+
+### Fixed
+
+- Fixed the first-run `Open settings` action appearing to do nothing when no profiles exist. The zero-profile render path previously always displayed the same empty-state card regardless of the selected navigation view.
+- Added a functional first-profile form for display name, calorie target, weekly exercise target, exercise-credit mode, nutrition display mode, timezone and metric units.
+- Newly created profiles are automatically selected as the active profile and HealthHub opens the Today view after creation.
+- Disabled Week, Progress and the profile selector until a profile exists so first-run navigation cannot lead to misleading empty states.
+
 ## 0.4.1 - Home Assistant Ingress Proxy Fix
 
 ### Fixed
@@ -79,29 +88,20 @@
 
 ### Deliberately deferred
 
-- OCR/AI nutrition-label extraction. v0.2 stores the image and requires manual review/entry; it does not fabricate extracted values.
-- Barcode lookup and external commercial nutrition APIs.
-- FoodHub recipe logging where authoritative per-serving nutrition is unavailable.
-- Exercise diary, weight tracking, weekly planning, recurrence, progress charts and wearable imports.
+- Barcode lookup.
+- OCR or AI extraction.
+- Meal-photo calorie estimation.
+- External commercial nutrition APIs.
+- Exercise diary, weight charts and wearable integrations.
 
 ## 0.1.0 - Foundation & Profiles
 
 ### Added
 
-- Home Assistant add-on configuration with Ingress, metric/Australian defaults and `aarch64`/`amd64` support.
-- FastAPI `/api/v1` foundation with health, version, profiles, active-profile selection, calorie-budget calculation and FoodHub integration status.
-- SQLite persistence under `/data/healthhub` with WAL, foreign keys and Alembic migrations from the first release.
-- Profile data model covering display name, optional body measurements and goal date, calorie target, exercise target, hydration target, exercise-credit mode, nutrition display mode, timezone and metric units.
-- Profile creation, update, archive and switching support without introducing module authentication.
-- Reusable calorie-budget domain calculation supporting no, full and percentage exercise credit with half-up whole-kcal rounding.
-- Typed FoodHub v1 adapter with short timeouts and graceful degraded-state behaviour.
-- Mobile-first React shell with Today, Week, Progress, Settings and Quick Add entry point.
-- Honest placeholders for deferred diary, weekly planning, progress and capture features.
-- Nutrition-label capture contract that requires review but deliberately performs no OCR in v0.1.0.
-- Unit, API and migration test foundations.
-
-### Compatibility
-
-- HealthHub owns a separate datastore and never queries FoodHub's database directly.
-- Home Assistant remains the sole authentication boundary.
-- No real personal health data is seeded.
+- Initial Home Assistant add-on foundation with FastAPI, React, SQLite and Ingress support.
+- Profile creation, editing, archiving and active-profile selection.
+- Persisted nutrition and activity targets and preferences.
+- Versioned `/api/v1` API and FoodHub integration adapter.
+- Initial Alembic migration and migration tests.
+- Reusable exercise-credit calorie-budget domain service.
+- Quick Add and nutrition-label capture extension points.

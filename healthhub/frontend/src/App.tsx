@@ -64,10 +64,25 @@ type FoodDraft = {
   fat_g: string
 }
 
+type ProfileDraft = {
+  display_name: string
+  daily_calorie_target: string
+  weekly_exercise_minutes_target: string
+  exercise_credit_mode: 'none' | 'full' | 'percentage'
+  exercise_credit_percentage: string
+  nutrition_display_mode: 'simple' | 'balanced' | 'detailed'
+  timezone: string
+}
+
 const API = './api/v1'
 const emptyFood: FoodDraft = {
   name: '', brand: '', serving_name: '1 serve', serving_grams: '', calories: '', energy_kj: '',
   protein_g: '', carbohydrates_g: '', fat_g: '',
+}
+const emptyProfile: ProfileDraft = {
+  display_name: '', daily_calorie_target: '2000', weekly_exercise_minutes_target: '150',
+  exercise_credit_mode: 'none', exercise_credit_percentage: '0', nutrition_display_mode: 'balanced',
+  timezone: 'Australia/Melbourne',
 }
 
 function todayIso() {
@@ -90,6 +105,8 @@ export default function App() {
   const [summary, setSummary] = useState<DailySummary | null>(null)
   const [foodDraft, setFoodDraft] = useState<FoodDraft>(emptyFood)
   const [savingFood, setSavingFood] = useState(false)
+  const [profileDraft, setProfileDraft] = useState<ProfileDraft>(emptyProfile)
+  const [savingProfile, setSavingProfile] = useState(false)
 
   const activeProfile = useMemo(
     () => profiles.find((profile) => profile.id === activeProfileId) ?? null,
@@ -165,6 +182,51 @@ export default function App() {
       setNotice('Profile switched')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not switch profile')
+    }
+  }
+
+  async function createProfile() {
+    if (!profileDraft.display_name.trim()) {
+      setNotice('Display name is required')
+      return
+    }
+    setSavingProfile(true)
+    try {
+      const mode = profileDraft.exercise_credit_mode
+      const percentage = mode === 'none' ? 0 : mode === 'full' ? 100 : Number(profileDraft.exercise_credit_percentage)
+      const response = await fetch(`${API}/profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: profileDraft.display_name.trim(),
+          daily_calorie_target: Number(profileDraft.daily_calorie_target),
+          weekly_exercise_minutes_target: Number(profileDraft.weekly_exercise_minutes_target),
+          exercise_credit_mode: mode,
+          exercise_credit_percentage: percentage,
+          nutrition_display_mode: profileDraft.nutrition_display_mode,
+          timezone: profileDraft.timezone,
+          measurement_units: 'metric',
+        }),
+      })
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null)
+        throw new Error(payload?.detail?.[0]?.msg ?? 'Could not create profile')
+      }
+      const profile = (await response.json()) as Profile
+      setProfiles((current) => [...current, profile].sort((a, b) => a.display_name.localeCompare(b.display_name)))
+      setActiveProfileId(profile.id)
+      const selected = await fetch(`${API}/active-profile`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profile_id: profile.id }),
+      })
+      if (!selected.ok) throw new Error('Profile was created but could not be selected')
+      await loadToday(profile.id)
+      setProfileDraft(emptyProfile)
+      setView('today')
+      setNotice(`${profile.display_name} profile created`)
+    } catch (err) {
+      setNotice(err instanceof Error ? err.message : 'Could not create profile')
+    } finally {
+      setSavingProfile(false)
     }
   }
 
@@ -246,12 +308,23 @@ export default function App() {
   if (loading) return <main className="state-page">Loading HealthHub…</main>
   if (error) return <main className="state-page"><h1>HealthHub</h1><p>{error}</p></main>
 
+  const profileForm = <section className="profile-onboarding"><p className="eyebrow">Profile</p><h1>Create your first profile</h1><p>Profiles separate household nutrition records. They are data selectors, not secure accounts.</p><div className="food-form">
+    <label>Display name<input autoFocus value={profileDraft.display_name} onChange={(e) => setProfileDraft({ ...profileDraft, display_name: e.target.value })} /></label>
+    <label>Daily calorie target<input inputMode="numeric" value={profileDraft.daily_calorie_target} onChange={(e) => setProfileDraft({ ...profileDraft, daily_calorie_target: e.target.value })} /></label>
+    <label>Weekly exercise target (minutes)<input inputMode="numeric" value={profileDraft.weekly_exercise_minutes_target} onChange={(e) => setProfileDraft({ ...profileDraft, weekly_exercise_minutes_target: e.target.value })} /></label>
+    <label>Exercise calorie credit<select value={profileDraft.exercise_credit_mode} onChange={(e) => setProfileDraft({ ...profileDraft, exercise_credit_mode: e.target.value as ProfileDraft['exercise_credit_mode'] })}><option value="none">No exercise credit</option><option value="full">Full exercise credit</option><option value="percentage">Percentage exercise credit</option></select></label>
+    {profileDraft.exercise_credit_mode === 'percentage' && <label>Exercise credit percentage<input inputMode="numeric" value={profileDraft.exercise_credit_percentage} onChange={(e) => setProfileDraft({ ...profileDraft, exercise_credit_percentage: e.target.value })} /></label>}
+    <label>Nutrition display<select value={profileDraft.nutrition_display_mode} onChange={(e) => setProfileDraft({ ...profileDraft, nutrition_display_mode: e.target.value as ProfileDraft['nutrition_display_mode'] })}><option value="simple">Simple: calories</option><option value="balanced">Balanced: calories and protein</option><option value="detailed">Detailed: calories, protein, carbohydrates and fat</option></select></label>
+    <label>Timezone<input value={profileDraft.timezone} onChange={(e) => setProfileDraft({ ...profileDraft, timezone: e.target.value })} /></label>
+    <label>Measurement units<input value="Metric" disabled /></label>
+  </div><button className="quick-add" disabled={savingProfile} onClick={() => void createProfile()}>{savingProfile ? 'Creating…' : 'Create profile'}</button></section>
+
   return (
     <div className="app-shell">
       <header className="topbar">
         <div><div className="brand">HealthHub</div><div className="subtitle">Nutrition & activity</div></div>
         <label className="profile-select"><span>Profile</span>
-          <select value={activeProfileId ?? ''} onChange={(event) => void switchProfile(event.target.value)}>
+          <select value={activeProfileId ?? ''} disabled={profiles.length === 0} onChange={(event) => void switchProfile(event.target.value)}>
             <option value="" disabled>Select profile</option>
             {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.display_name}</option>)}
           </select>
@@ -260,7 +333,7 @@ export default function App() {
 
       <main className="content">
         {notice && <div className="notice" role="status">{notice}</div>}
-        {profiles.length === 0 ? <section className="empty-card"><h1>Create your first profile</h1><p>Profiles separate household nutrition records. They are not secure accounts.</p><button onClick={() => setView('settings')}>Open settings</button></section>
+        {profiles.length === 0 ? (view === 'settings' ? profileForm : <section className="empty-card"><h1>Create your first profile</h1><p>Profiles separate household nutrition records. They are not secure accounts.</p><button onClick={() => setView('settings')}>Open settings</button></section>)
         : view === 'today' ? <section>
           <div className="page-heading"><div><p className="eyebrow">Today</p><h1>{activeProfile ? `${activeProfile.display_name}'s day` : 'Select a profile'}</h1></div><button className="quick-add" onClick={() => setQuickAddOpen(true)}>+ Quick Add</button></div>
           {activeProfile && summary ? <div className="target-grid">
@@ -270,40 +343,17 @@ export default function App() {
             <article className="target-card"><span>Daily target</span><strong>{summary.calorie_target.toLocaleString('en-AU')} kcal</strong></article>
           </div> : null}
           {(summary?.exercise_minutes ?? 0) > 0 && <p className="activity-note">Today: {summary?.exercise_minutes ?? 0} exercise min, {summary?.completed_exercise_calories ?? 0} kcal completed before credit settings.</p>}
-          <section className="diary-list">
-            <div className="section-heading"><h2>Food diary</h2><span>{summary?.entry_count ?? 0} items</span></div>
-            {entries.length === 0 ? <article className="empty-card"><h2>Nothing logged yet</h2><p>Use Quick Add to search your HealthHub foods and available FoodHub recipes.</p></article>
-            : entries.map((entry) => <article className="diary-row" key={entry.id}><div><span className="meal-tag">{entry.meal_period}</span><strong>{entry.food_name}</strong><small>{entry.servings} × {entry.serving_name}</small></div><div className="diary-energy"><strong>{Math.round(entry.calories)} kcal</strong><button aria-label={`Remove ${entry.food_name}`} onClick={() => void deleteEntry(entry.id)}>Remove</button></div></article>)}
-          </section>
+          <section className="diary-list"><div className="section-heading"><h2>Food diary</h2><span>{summary?.entry_count ?? 0} items</span></div>{entries.length === 0 ? <article className="empty-card"><h2>Nothing logged yet</h2><p>Use Quick Add to search your HealthHub foods and available FoodHub recipes.</p></article> : entries.map((entry) => <article className="diary-row" key={entry.id}><div><span className="meal-tag">{entry.meal_period}</span><strong>{entry.food_name}</strong><small>{entry.servings} × {entry.serving_name}</small></div><div className="diary-energy"><strong>{Math.round(entry.calories)} kcal</strong><button aria-label={`Remove ${entry.food_name}`} onClick={() => void deleteEntry(entry.id)}>Remove</button></div></article>)}</section>
         </section>
         : view === 'week' && activeProfileId ? <WeekView profileId={activeProfileId} onNotice={setNotice} />
         : view === 'progress' && activeProfileId ? <ProgressView profileId={activeProfileId} onNotice={setNotice} onActivityChanged={() => loadToday(activeProfileId)} />
-        : view === 'settings' ? <section><p className="eyebrow">Settings</p><h1>Foods & preferences</h1><p>Add foods from Australian packaging or other trusted sources. Values are stored per serving and can be edited later through the API.</p>
-          <div className="food-form">
-            <label>Name<input value={foodDraft.name} onChange={(e) => setFoodDraft({ ...foodDraft, name: e.target.value })} /></label>
-            <label>Brand<input value={foodDraft.brand} onChange={(e) => setFoodDraft({ ...foodDraft, brand: e.target.value })} /></label>
-            <label>Serving<input value={foodDraft.serving_name} onChange={(e) => setFoodDraft({ ...foodDraft, serving_name: e.target.value })} /></label>
-            <label>Serving grams<input inputMode="decimal" value={foodDraft.serving_grams} onChange={(e) => setFoodDraft({ ...foodDraft, serving_grams: e.target.value })} /></label>
-            <label>Energy (kJ)<input inputMode="decimal" value={foodDraft.energy_kj} onChange={(e) => setFoodDraft({ ...foodDraft, energy_kj: e.target.value })} /></label>
-            <label>Calories (kcal)<input inputMode="decimal" value={foodDraft.calories} onChange={(e) => setFoodDraft({ ...foodDraft, calories: e.target.value })} /></label>
-            <label>Protein (g)<input inputMode="decimal" value={foodDraft.protein_g} onChange={(e) => setFoodDraft({ ...foodDraft, protein_g: e.target.value })} /></label>
-            <label>Carbohydrates (g)<input inputMode="decimal" value={foodDraft.carbohydrates_g} onChange={(e) => setFoodDraft({ ...foodDraft, carbohydrates_g: e.target.value })} /></label>
-            <label>Fat (g)<input inputMode="decimal" value={foodDraft.fat_g} onChange={(e) => setFoodDraft({ ...foodDraft, fat_g: e.target.value })} /></label>
-          </div><button className="quick-add" disabled={savingFood} onClick={() => void saveFood()}>{savingFood ? 'Saving…' : 'Save food'}</button>
-        </section>
+        : view === 'settings' ? <section><p className="eyebrow">Settings</p><h1>Foods & preferences</h1><p>Add foods from Australian packaging or other trusted sources. Values are stored per serving and can be edited later through the API.</p><div className="food-form"><label>Name<input value={foodDraft.name} onChange={(e) => setFoodDraft({ ...foodDraft, name: e.target.value })} /></label><label>Brand<input value={foodDraft.brand} onChange={(e) => setFoodDraft({ ...foodDraft, brand: e.target.value })} /></label><label>Serving<input value={foodDraft.serving_name} onChange={(e) => setFoodDraft({ ...foodDraft, serving_name: e.target.value })} /></label><label>Serving grams<input inputMode="decimal" value={foodDraft.serving_grams} onChange={(e) => setFoodDraft({ ...foodDraft, serving_grams: e.target.value })} /></label><label>Energy (kJ)<input inputMode="decimal" value={foodDraft.energy_kj} onChange={(e) => setFoodDraft({ ...foodDraft, energy_kj: e.target.value })} /></label><label>Calories (kcal)<input inputMode="decimal" value={foodDraft.calories} onChange={(e) => setFoodDraft({ ...foodDraft, calories: e.target.value })} /></label><label>Protein (g)<input inputMode="decimal" value={foodDraft.protein_g} onChange={(e) => setFoodDraft({ ...foodDraft, protein_g: e.target.value })} /></label><label>Carbohydrates (g)<input inputMode="decimal" value={foodDraft.carbohydrates_g} onChange={(e) => setFoodDraft({ ...foodDraft, carbohydrates_g: e.target.value })} /></label><label>Fat (g)<input inputMode="decimal" value={foodDraft.fat_g} onChange={(e) => setFoodDraft({ ...foodDraft, fat_g: e.target.value })} /></label></div><button className="quick-add" disabled={savingFood} onClick={() => void saveFood()}>{savingFood ? 'Saving…' : 'Save food'}</button></section>
         : <section className="empty-card"><h1>Select a profile</h1><p>Choose a profile to use HealthHub.</p></section>}
       </main>
 
-      <nav className="bottom-nav" aria-label="Primary navigation"><button onClick={() => setView('today')} aria-current={view === 'today' ? 'page' : undefined}>Today</button><button onClick={() => setView('week')} aria-current={view === 'week' ? 'page' : undefined}>Week</button><button onClick={() => setView('progress')} aria-current={view === 'progress' ? 'page' : undefined}>Progress</button><button onClick={() => setView('settings')} aria-current={view === 'settings' ? 'page' : undefined}>Settings</button></nav>
+      <nav className="bottom-nav" aria-label="Primary navigation"><button onClick={() => setView('today')} aria-current={view === 'today' ? 'page' : undefined}>Today</button><button disabled={profiles.length === 0} onClick={() => setView('week')} aria-current={view === 'week' ? 'page' : undefined}>Week</button><button disabled={profiles.length === 0} onClick={() => setView('progress')} aria-current={view === 'progress' ? 'page' : undefined}>Progress</button><button onClick={() => setView('settings')} aria-current={view === 'settings' ? 'page' : undefined}>Settings</button></nav>
 
-      {quickAddOpen && <div className="sheet-backdrop" onClick={() => setQuickAddOpen(false)}><section className="quick-sheet" onClick={(event) => event.stopPropagation()}><div className="sheet-handle" /><h2>Quick Add</h2>
-        <label className="meal-period">Add to<select value={mealPeriod} onChange={(e) => setMealPeriod(e.target.value as DiaryEntry['meal_period'])}><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option><option value="drink">Drink</option></select></label>
-        <input autoFocus aria-label="Search foods and meals" placeholder="Search foods, drinks or FoodHub recipes" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {searching && <p>Searching…</p>}
-        <div className="search-results">{searchResults.map((result) => <button key={`${result.source}-${result.id}`} className="search-result" onClick={() => void addSearchResult(result)}><span><strong>{result.name}</strong><small>{result.subtitle} · {result.source === 'foodhub' ? 'FoodHub' : 'HealthHub'}</small></span><b>{result.calories == null ? 'Nutrition pending' : `${Math.round(result.calories)} kcal`}</b></button>)}</div>
-        {search.trim().length >= 2 && !searching && searchResults.length === 0 && <p>No matching foods yet. Add a food in Settings.</p>}
-        <div className="secondary-actions"><label className="upload-action">Nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadLabel(file) }} /></label><button disabled>Scan barcode</button><button disabled>Photograph meal</button><button disabled>Quick calories</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Exercise</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Weight</button><button disabled>Water</button></div>
-        <button onClick={() => setQuickAddOpen(false)}>Close</button></section></div>}
+      {quickAddOpen && <div className="sheet-backdrop" onClick={() => setQuickAddOpen(false)}><section className="quick-sheet" onClick={(event) => event.stopPropagation()}><div className="sheet-handle" /><h2>Quick Add</h2><label className="meal-period">Add to<select value={mealPeriod} onChange={(e) => setMealPeriod(e.target.value as DiaryEntry['meal_period'])}><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option><option value="drink">Drink</option></select></label><input autoFocus aria-label="Search foods and meals" placeholder="Search foods, drinks or FoodHub recipes" value={search} onChange={(e) => setSearch(e.target.value)} />{searching && <p>Searching…</p>}<div className="search-results">{searchResults.map((result) => <button key={`${result.source}-${result.id}`} className="search-result" onClick={() => void addSearchResult(result)}><span><strong>{result.name}</strong><small>{result.subtitle} · {result.source === 'foodhub' ? 'FoodHub' : 'HealthHub'}</small></span><b>{result.calories == null ? 'Nutrition pending' : `${Math.round(result.calories)} kcal`}</b></button>)}</div>{search.trim().length >= 2 && !searching && searchResults.length === 0 && <p>No matching foods yet. Add a food in Settings.</p>}<div className="secondary-actions"><label className="upload-action">Nutrition label<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadLabel(file) }} /></label><button disabled>Scan barcode</button><button disabled>Photograph meal</button><button disabled>Quick calories</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Exercise</button><button onClick={() => { setQuickAddOpen(false); setView('progress') }}>Weight</button><button disabled>Water</button></div><button onClick={() => setQuickAddOpen(false)}>Close</button></section></div>}
     </div>
   )
 }

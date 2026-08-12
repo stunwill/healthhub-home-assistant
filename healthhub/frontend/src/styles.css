@@ -3,7 +3,7 @@
 body { margin: 0; min-width: 320px; min-height: 100vh; background: #f3f7f5; }
 button, input, select { font: inherit; }
 button { min-height: 44px; border: 0; border-radius: 12px; padding: 0 16px; cursor: pointer; }
-button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
+button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity: .55; }
 .app-shell { min-height: 100vh; padding-bottom: 84px; }
 .topbar { position: sticky; top: 0; z-index: 5; display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 16px 18px; background: rgba(243,247,245,.96); border-bottom: 1px solid #d9e5df; }
 .brand { font-size: 1.35rem; font-weight: 800; }
@@ -19,7 +19,7 @@ button:disabled, input:disabled { cursor: not-allowed; opacity: .55; }
 h1, h2, p { margin-top: 0; }
 .quick-add { background: #1e6d52; color: white; font-weight: 700; }
 .target-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-.target-card, .empty-card, .diary-row { background: white; border: 1px solid #dbe7e1; border-radius: 18px; padding: 18px; box-shadow: 0 8px 24px rgba(26,64,51,.05); }
+.target-card, .empty-card, .diary-row, .profile-onboarding { background: white; border: 1px solid #dbe7e1; border-radius: 18px; padding: 18px; box-shadow: 0 8px 24px rgba(26,64,51,.05); }
 .target-card span { display: block; color: #687a73; font-size: .8rem; margin-bottom: 8px; }
 .target-card strong { font-size: 1.15rem; text-transform: capitalize; }
 .diary-list { margin-top: 18px; }
@@ -37,7 +37,7 @@ h1, h2, p { margin-top: 0; }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.35); display: flex; align-items: end; }
 .quick-sheet { width: 100%; max-height: 88vh; overflow: auto; background: white; padding: 12px 18px calc(24px + env(safe-area-inset-bottom)); border-radius: 24px 24px 0 0; }
 .sheet-handle { width: 48px; height: 5px; margin: 0 auto 16px; background: #ccd8d2; border-radius: 999px; }
-.quick-sheet input, .food-form input { width: 100%; min-height: 48px; border: 1px solid #c8d8d0; border-radius: 14px; padding: 0 14px; background: white; color: #17352c; }
+.quick-sheet input, .food-form input, .food-form select { width: 100%; min-height: 48px; border: 1px solid #c8d8d0; border-radius: 14px; padding: 0 14px; background: white; color: #17352c; }
 .meal-period { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
 .search-results { display: grid; gap: 8px; margin-bottom: 12px; }
 .search-result { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f6faf8; border: 1px solid #dce8e2; text-align: left; color: #17352c; }
@@ -49,4 +49,5 @@ h1, h2, p { margin-top: 0; }
 .upload-action input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .food-form { display: grid; gap: 12px; margin: 18px 0; }
 .food-form label { display: grid; gap: 6px; color: #526a60; font-size: .82rem; font-weight: 600; }
+.profile-onboarding { max-width: 760px; margin: 0 auto; }
 @media (min-width: 760px) { .content { padding: 32px; } .target-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } .quick-sheet { width: min(620px, calc(100% - 48px)); margin: auto; border-radius: 24px; } .sheet-backdrop { align-items: center; } .food-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
