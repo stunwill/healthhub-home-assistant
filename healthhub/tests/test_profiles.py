@@ -1,8 +1,4 @@
-import os
 from pathlib import Path
-
-os.environ["HEALTHHUB_DATABASE_URL"] = "sqlite:///./test-healthhub.db"
-os.environ["HEALTHHUB_ACTIVE_PROFILE_FILE"] = "./test-active-profile.json"
 
 from fastapi.testclient import TestClient
 
@@ -27,7 +23,7 @@ def profile_payload() -> dict:
         "exercise_credit_percentage": 50,
         "nutrition_display_mode": "balanced",
         "timezone": "Australia/Melbourne",
-        "measurement_units": "metric"
+        "measurement_units": "metric",
     }
 
 
