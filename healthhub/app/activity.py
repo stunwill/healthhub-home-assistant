@@ -239,5 +239,5 @@ def progress_summary(
         starting_weight_kg=profile.starting_weight_kg,
         goal_weight_kg=profile.goal_weight_kg,
         change_from_start_kg=change,
-        weight_entries=weights,
+        weight_entries=[WeightOutput.model_validate(entry) for entry in weights],
     )
