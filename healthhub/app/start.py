@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from . import planning_events  # noqa: F401
 from .main import app
 from .planning import router as planning_router
 
 # The v0.2 application defines the SPA catch-all after its API routes. Register
-# v0.3 planning routes before that fallback so /api/v1/planning requests are not
+# v0.3 planning routes before that fallback so /api/v1 planning requests are not
 # treated as frontend paths.
 frontend_fallback = next(
     (route for route in app.router.routes if getattr(route, "path", None) == "/{full_path:path}"),
