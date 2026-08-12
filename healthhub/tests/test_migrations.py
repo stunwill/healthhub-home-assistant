@@ -18,3 +18,5 @@ def test_migrations_create_current_schema(tmp_path: Path, monkeypatch) -> None: 
     assert "profiles" in tables
     assert "foods" in tables
     assert "diary_entries" in tables
+    assert "exercise_entries" in tables
+    assert "weight_entries" in tables
