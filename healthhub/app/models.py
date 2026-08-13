@@ -21,9 +21,19 @@ class ExerciseCreditMode(StrEnum):
 
 
 class NutritionDisplayMode(StrEnum):
+    """Legacy preset retained for migration and API compatibility."""
+
     SIMPLE = "simple"
     BALANCED = "balanced"
     DETAILED = "detailed"
+
+
+class NutritionField(StrEnum):
+    CALORIES = "calories"
+    PROTEIN = "protein"
+    CARBOHYDRATES = "carbohydrates"
+    FAT = "fat"
+    SUGAR = "sugar"
 
 
 class MeasurementUnits(StrEnum):
@@ -60,6 +70,9 @@ class Profile(Base):
     exercise_credit_mode: Mapped[str] = mapped_column(String(20), default=ExerciseCreditMode.NONE.value)
     exercise_credit_percentage: Mapped[int] = mapped_column(Integer, default=0)
     nutrition_display_mode: Mapped[str] = mapped_column(String(20), default=NutritionDisplayMode.SIMPLE.value)
+    _nutrition_display_fields: Mapped[str] = mapped_column(
+        "nutrition_display_fields", String(100), default=NutritionField.CALORIES.value
+    )
     timezone: Mapped[str] = mapped_column(String(100), default="Australia/Melbourne")
     measurement_units: Mapped[str] = mapped_column(String(20), default=MeasurementUnits.METRIC.value)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
@@ -67,6 +80,15 @@ class Profile(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
     diary_entries: Mapped[list[DiaryEntry]] = relationship(back_populates="profile", cascade="all, delete-orphan")
+
+    @property
+    def nutrition_display_fields(self) -> list[str]:
+        return [value for value in self._nutrition_display_fields.split(",") if value]
+
+    @nutrition_display_fields.setter
+    def nutrition_display_fields(self, values: list[str] | list[NutritionField]) -> None:
+        normalised = [value.value if isinstance(value, NutritionField) else value for value in values]
+        self._nutrition_display_fields = ",".join(dict.fromkeys(normalised))
 
 
 class Food(Base):
@@ -83,6 +105,7 @@ class Food(Base):
     protein_g: Mapped[float | None] = mapped_column(Float)
     carbohydrates_g: Mapped[float | None] = mapped_column(Float)
     fat_g: Mapped[float | None] = mapped_column(Float)
+    sugar_g: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(40), default="manual", index=True)
     favourite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
@@ -92,9 +115,7 @@ class Food(Base):
 
     diary_entries: Mapped[list[DiaryEntry]] = relationship(back_populates="food")
 
-    __table_args__ = (
-        Index("ix_foods_search", "archived", "name", "brand"),
-    )
+    __table_args__ = (Index("ix_foods_search", "archived", "name", "brand"),)
 
 
 class DiaryEntry(Base):
@@ -112,6 +133,7 @@ class DiaryEntry(Base):
     protein_g: Mapped[float | None] = mapped_column(Float)
     carbohydrates_g: Mapped[float | None] = mapped_column(Float)
     fat_g: Mapped[float | None] = mapped_column(Float)
+    sugar_g: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(40), default="healthhub")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
@@ -119,6 +141,4 @@ class DiaryEntry(Base):
     profile: Mapped[Profile] = relationship(back_populates="diary_entries")
     food: Mapped[Food | None] = relationship(back_populates="diary_entries")
 
-    __table_args__ = (
-        Index("ix_diary_profile_consumed", "profile_id", "consumed_at"),
-    )
+    __table_args__ = (Index("ix_diary_profile_consumed", "profile_id", "consumed_at"),)
