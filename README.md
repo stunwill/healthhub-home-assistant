@@ -2,27 +2,38 @@
 
 HealthHub is a Home Assistant add-on for personal nutrition, calorie planning, activity goals and progress tracking, with a versioned integration to FoodHub.
 
-## Current development release: v0.4.0
+## Current development release: v0.5.0
 
-HealthHub v0.4.0 adds weekly food planning and recurrence to the existing nutrition, exercise and progress workflows:
+HealthHub v0.5.0 adds hydration tracking, flexible nutrition display preferences and richer progress visualisation to the existing diary and planning workflows:
 
 - profile-scoped daily food diary
 - persistent HealthHub food catalogue
+- calories, protein, carbohydrates, fat and optional sugar data
+- multi-select nutrition display fields per profile
 - predictive Quick Add for HealthHub foods
-- manual exercise and metric weight logging
+- manual exercise, metric weight and water logging
 - exercise-credit-aware daily calorie budgets
-- functional Progress view
-- planned food entries with nutrition snapshots
+- hydration progress against an optional user-configured target
+- improved Progress view with seven-day exercise progress and weight trend visualisation
+- planned food entries with immutable nutrition snapshots
 - functional Week view with planned versus consumed totals
-- consume, skip and remove planning actions
 - daily, weekday and weekly recurrence rules
 - phone camera or existing-image nutrition-label capture with mandatory human review
 
 Profiles are data selectors, not secure accounts. Home Assistant is the trust boundary and HealthHub does not implement its own login, passwords, PINs, passkeys or account registration.
 
+## Profile defaults
+
+HealthHub is currently designed for the Australian household installation it serves. Profile setup therefore uses these defaults without asking the user to configure them:
+
+- timezone: `Australia/Melbourne`
+- measurement units: metric
+
+Nutrition display is independently selectable across Calories, Protein, Carbohydrates, Fat and Sugar. For example, a profile can show Calories + Sugar only.
+
 ## Architecture
 
-HealthHub is a separate application and datastore from FoodHub. It does not read FoodHub's database directly. FoodHub remains the source of truth for shared recipes and scheduled household meals, while HealthHub owns personal profiles, nutrition foods, diary entries, exercise, weight, plans, recurrence and progress data.
+HealthHub is a separate application and datastore from FoodHub. It does not read FoodHub's database directly. FoodHub remains the source of truth for shared recipes and scheduled household meals, while HealthHub owns personal profiles, nutrition foods, diary entries, exercise, weight, hydration, plans, recurrence and progress data.
 
 Backend: Python 3.12, FastAPI, SQLAlchemy, Alembic and SQLite.
 
@@ -32,17 +43,22 @@ Supported Home Assistant architectures: `aarch64` and `amd64`.
 
 ## Data model
 
-v0.4.0 contains seven application tables:
+v0.5.0 contains eight application tables:
 
 - `profiles`, profile identity and nutrition/activity preferences
 - `foods`, reusable nutrition and serving definitions
 - `diary_entries`, consumed items with immutable nutrition snapshots
 - `exercise_entries`, completed activity with user-supplied duration and calories burned
 - `weight_entries`, timestamped metric weight measurements
+- `water_entries`, profile-scoped hydration logs in millilitres
 - `planned_entries`, profile-specific planned food snapshots and status
 - `recurrence_rules`, simple daily, weekday and weekly planning rules
 
-Consumed diary entries and planned entries both snapshot nutrition so later food edits do not silently rewrite historical or already-planned values.
+Consumed diary entries and planned entries snapshot nutrition, including sugar where available, so later food edits do not silently rewrite historical or already-planned values.
+
+## Hydration
+
+Hydration targets are optional and user configured. HealthHub does not prescribe a target. Water can be logged in millilitres from Quick Add or Progress, including 250 mL, 500 mL and 750 mL shortcuts.
 
 ## Planning and recurrence
 
@@ -108,4 +124,4 @@ Production data lives under `/data/healthhub`. SQLite uses WAL mode, foreign key
 
 ## Roadmap
 
-A sensible next scope is hydration logging and richer progress visualisation. Drag-and-drop planning, unscheduled meal trays, barcode/OCR integrations, wearables and smart-scale imports remain later work.
+A sensible next scope is richer food entry and FoodHub nutrition integration, followed by barcode/OCR integrations. Drag-and-drop planning, unscheduled meal trays, wearables and smart-scale imports remain later work.
