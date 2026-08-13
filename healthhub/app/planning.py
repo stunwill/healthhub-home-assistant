@@ -56,7 +56,12 @@ def scale(value: float | None, servings: float) -> float | None:
 
 
 def planned_from_food(
-    *, profile: Profile, food: Food, planned_for: datetime, meal_period: str, servings: float,
+    *,
+    profile: Profile,
+    food: Food,
+    planned_for: datetime,
+    meal_period: str,
+    servings: float,
     recurrence_rule_id: str | None = None,
 ) -> PlannedEntry:
     return PlannedEntry(
@@ -72,6 +77,7 @@ def planned_from_food(
         protein_g=scale(food.protein_g, servings),
         carbohydrates_g=scale(food.carbohydrates_g, servings),
         fat_g=scale(food.fat_g, servings),
+        sugar_g=scale(food.sugar_g, servings),
         source=food.source,
     )
 
@@ -135,6 +141,7 @@ def consume_planned_entry(profile_id: str, entry_id: str, db: DbSession) -> Plan
         protein_g=entry.protein_g,
         carbohydrates_g=entry.carbohydrates_g,
         fat_g=entry.fat_g,
+        sugar_g=entry.sugar_g,
         source=entry.source,
     )
     db.add(diary)
@@ -192,19 +199,23 @@ def materialise_rule(db: Session, profile: Profile, food: Food, rule: Recurrence
         if recurrence_matches(target, rule):
             local_dt = datetime.combine(target, time(hour, minute), tzinfo=zone)
             utc_dt = local_dt.astimezone(timezone.utc)
-            exists = db.scalar(select(PlannedEntry.id).where(
-                PlannedEntry.recurrence_rule_id == rule.id,
-                PlannedEntry.planned_for == utc_dt,
-            ))
+            exists = db.scalar(
+                select(PlannedEntry.id).where(
+                    PlannedEntry.recurrence_rule_id == rule.id,
+                    PlannedEntry.planned_for == utc_dt,
+                )
+            )
             if not exists:
-                db.add(planned_from_food(
-                    profile=profile,
-                    food=food,
-                    planned_for=local_dt,
-                    meal_period=rule.meal_period,
-                    servings=rule.servings,
-                    recurrence_rule_id=rule.id,
-                ))
+                db.add(
+                    planned_from_food(
+                        profile=profile,
+                        food=food,
+                        planned_for=local_dt,
+                        meal_period=rule.meal_period,
+                        servings=rule.servings,
+                        recurrence_rule_id=rule.id,
+                    )
+                )
                 created += 1
         target += timedelta(days=1)
     return created
@@ -265,26 +276,36 @@ def weekly_plan(profile_id: str, db: DbSession, start: date | None = None) -> We
     for offset in range(7):
         current = week_start + timedelta(days=offset)
         first, last = day_bounds(current, profile.timezone)
-        planned = list(db.scalars(select(PlannedEntry).where(
-            PlannedEntry.profile_id == profile_id,
-            PlannedEntry.planned_for.between(first, last),
-            PlannedEntry.status == PlannedEntryStatus.PLANNED.value,
-        )).all())
-        consumed = list(db.scalars(select(DiaryEntry).where(
-            DiaryEntry.profile_id == profile_id,
-            DiaryEntry.consumed_at.between(first, last),
-        )).all())
+        planned = list(
+            db.scalars(
+                select(PlannedEntry).where(
+                    PlannedEntry.profile_id == profile_id,
+                    PlannedEntry.planned_for.between(first, last),
+                    PlannedEntry.status == PlannedEntryStatus.PLANNED.value,
+                )
+            ).all()
+        )
+        consumed = list(
+            db.scalars(
+                select(DiaryEntry).where(
+                    DiaryEntry.profile_id == profile_id,
+                    DiaryEntry.consumed_at.between(first, last),
+                )
+            ).all()
+        )
         planned_kcal = round(sum(item.calories for item in planned))
         consumed_kcal = round(sum(item.calories for item in consumed))
         planned_total += planned_kcal
         consumed_total += consumed_kcal
-        day_rows.append(WeeklyPlanDay(
-            date=current,
-            planned_calories=planned_kcal,
-            planned_count=len(planned),
-            consumed_calories=consumed_kcal,
-            consumed_count=len(consumed),
-        ))
+        day_rows.append(
+            WeeklyPlanDay(
+                date=current,
+                planned_calories=planned_kcal,
+                planned_count=len(planned),
+                consumed_calories=consumed_kcal,
+                consumed_count=len(consumed),
+            )
+        )
     return WeeklyPlanOutput(
         profile_id=profile_id,
         start_date=week_start,
