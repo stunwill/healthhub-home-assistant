@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.5.0 - Hydration & Progress Visualisation
+
+### Added
+
+- Added profile-scoped water logging with millilitre amounts, timezone-aware timestamps, history and delete support.
+- Added hydration progress to Today and Progress using the profile's optional hydration target.
+- Added Quick Add access to the Water workflow and common 250 mL, 500 mL and 750 mL shortcuts.
+- Added sugar as an optional nutrition value on HealthHub foods, consumed diary snapshots and planned-entry snapshots.
+- Added a true multi-select nutrition-display preference supporting any combination of Calories, Protein, Carbohydrates, Fat and Sugar, including Calories + Sugar only.
+- Added improved Progress visualisation for the last seven days of exercise against the weekly target and a lightweight weight trend chart.
+- Added Alembic migration `0005_hydration_nutrition_fields` and backend coverage for hydration, sugar snapshots, nutrition preferences and migrations.
+
+### Changed
+
+- Profile onboarding no longer asks for timezone or measurement units. HealthHub uses `Australia/Melbourne` and metric units automatically.
+- Existing Simple, Balanced and Detailed nutrition presets are migrated to equivalent explicit nutrition-field selections.
+- Profile Settings now lets an existing profile update its nutrition-display fields and optional hydration target.
+- Progress now compares the weekly exercise target with the actual last seven days rather than comparing a 90-day total with one weekly target.
+
+### Data / migration impact
+
+- Adds the `water_entries` table.
+- Adds `nutrition_display_fields` to profiles.
+- Adds nullable `sugar_g` columns to foods, diary entries and planned entries.
+- Existing profile nutrition-display settings are preserved through migration mapping.
+- Existing food, diary, planning, exercise and weight data is preserved.
+
+### Safety and scope
+
+- HealthHub does not prescribe hydration targets, calorie targets, weight goals or exercise calories.
+- Hydration targets remain optional and user-configured.
+- OCR/AI label extraction, barcode lookup, wearable imports and smart-scale integration remain deferred.
+
 ## 0.4.2 - Profile Onboarding Fix
 
 ### Fixed
