@@ -56,6 +56,7 @@ class PlannedEntry(Base):
     protein_g: Mapped[float | None] = mapped_column(Float)
     carbohydrates_g: Mapped[float | None] = mapped_column(Float)
     fat_g: Mapped[float | None] = mapped_column(Float)
+    sugar_g: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(40), default="healthhub")
     status: Mapped[str] = mapped_column(String(20), default=PlannedEntryStatus.PLANNED.value, index=True)
     consumed_diary_entry_id: Mapped[str | None] = mapped_column(ForeignKey("diary_entries.id", ondelete="SET NULL"))
