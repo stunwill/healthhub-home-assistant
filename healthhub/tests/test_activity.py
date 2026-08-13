@@ -25,15 +25,19 @@ def create_profile(*, credit_mode: str = "percentage", percentage: int = 50) -> 
             "goal_weight_kg": 75,
             "daily_calorie_target": 1800,
             "weekly_exercise_minutes_target": 150,
+            "hydration_target_ml": 2000,
             "exercise_credit_mode": credit_mode,
             "exercise_credit_percentage": percentage,
             "nutrition_display_mode": "balanced",
+            "nutrition_display_fields": ["calories", "sugar"],
             "timezone": "Australia/Melbourne",
             "measurement_units": "metric",
         },
     )
     assert response.status_code == 201
-    return response.json()["id"]
+    payload = response.json()
+    assert payload["nutrition_display_fields"] == ["calories", "sugar"]
+    return payload["id"]
 
 
 def create_food() -> str:
@@ -47,6 +51,7 @@ def create_food() -> str:
             "protein_g": 30,
             "carbohydrates_g": 60,
             "fat_g": 20,
+            "sugar_g": 12,
             "favourite": False,
             "source": "test",
         },
@@ -55,7 +60,7 @@ def create_food() -> str:
     return response.json()["id"]
 
 
-def test_exercise_credit_flows_into_daily_budget() -> None:
+def test_exercise_hydration_and_sugar_flow_into_daily_summary() -> None:
     profile_id = create_profile()
     food_id = create_food()
     diary = client.post(
@@ -68,6 +73,7 @@ def test_exercise_credit_flows_into_daily_budget() -> None:
         },
     )
     assert diary.status_code == 201
+    assert diary.json()["sugar_g"] == 24
 
     exercise = client.post(
         f"/api/v1/profiles/{profile_id}/exercise",
@@ -80,6 +86,12 @@ def test_exercise_credit_flows_into_daily_budget() -> None:
     )
     assert exercise.status_code == 201
 
+    water = client.post(
+        f"/api/v1/profiles/{profile_id}/water",
+        json={"amount_ml": 500, "consumed_at": "2026-08-13T14:00:00+10:00"},
+    )
+    assert water.status_code == 201
+
     summary = client.get(f"/api/v1/profiles/{profile_id}/daily-summary?day=2026-08-13")
     assert summary.status_code == 200
     payload = summary.json()
@@ -88,6 +100,9 @@ def test_exercise_credit_flows_into_daily_budget() -> None:
     assert payload["credited_exercise_calories"] == 150
     assert payload["exercise_minutes"] == 40
     assert payload["remaining_calories"] == 750
+    assert payload["hydration_ml"] == 500
+    assert payload["hydration_target_ml"] == 2000
+    assert payload["sugar_g"] == 24
 
 
 def test_no_credit_mode_does_not_add_exercise_calories() -> None:
@@ -127,19 +142,36 @@ def test_weight_and_progress_summary() -> None:
     assert payload["starting_weight_kg"] == 80
     assert payload["goal_weight_kg"] == 75
     assert payload["change_from_start_kg"] == -1.2
+    assert payload["hydration_target_ml"] == 2000
     assert len(payload["weight_entries"]) == 2
+
+
+def test_water_crud_and_timestamp_validation() -> None:
+    profile_id = create_profile()
+    invalid = client.post(
+        f"/api/v1/profiles/{profile_id}/water",
+        json={"amount_ml": 250, "consumed_at": "2026-08-13T08:00:00"},
+    )
+    assert invalid.status_code == 422
+
+    created = client.post(
+        f"/api/v1/profiles/{profile_id}/water",
+        json={"amount_ml": 250, "consumed_at": "2026-08-13T08:00:00+10:00"},
+    )
+    assert created.status_code == 201
+    entry_id = created.json()["id"]
+    listed = client.get(f"/api/v1/profiles/{profile_id}/water?day=2026-08-13")
+    assert listed.status_code == 200
+    assert listed.json()[0]["amount_ml"] == 250
+    deleted = client.delete(f"/api/v1/profiles/{profile_id}/water/{entry_id}")
+    assert deleted.status_code == 204
 
 
 def test_activity_timestamps_require_timezone() -> None:
     profile_id = create_profile()
     exercise = client.post(
         f"/api/v1/profiles/{profile_id}/exercise",
-        json={
-            "activity_name": "Walk",
-            "duration_minutes": 20,
-            "calories_burned": 100,
-            "completed_at": "2026-08-13T18:00:00",
-        },
+        json={"activity_name": "Walk", "duration_minutes": 20, "calories_burned": 100, "completed_at": "2026-08-13T18:00:00"},
     )
     weight = client.post(
         f"/api/v1/profiles/{profile_id}/weights",
