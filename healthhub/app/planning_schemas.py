@@ -38,6 +38,7 @@ class PlannedEntryOutput(BaseModel):
     protein_g: float | None
     carbohydrates_g: float | None
     fat_g: float | None
+    sugar_g: float | None
     source: str
     status: PlannedEntryStatus
     consumed_diary_entry_id: str | None

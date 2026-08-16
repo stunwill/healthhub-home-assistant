@@ -22,7 +22,6 @@ class ExerciseCreate(BaseModel):
 
 class ExerciseOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     profile_id: str
     activity_name: str
@@ -50,11 +49,35 @@ class WeightCreate(BaseModel):
 
 class WeightOutput(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: str
     profile_id: str
     weight_kg: float
     measured_at: datetime
+    source: str
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WaterCreate(BaseModel):
+    amount_ml: int = Field(gt=0, le=10000)
+    consumed_at: datetime
+    notes: str | None = Field(default=None, max_length=1000)
+
+    @field_validator("consumed_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("consumed_at must include a timezone")
+        return value
+
+
+class WaterOutput(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    profile_id: str
+    amount_ml: int
+    consumed_at: datetime
     source: str
     notes: str | None
     created_at: datetime
@@ -70,9 +93,12 @@ class DailySummaryV030(BaseModel):
     credited_exercise_calories: int
     remaining_calories: int
     exercise_minutes: int
+    hydration_ml: int
+    hydration_target_ml: int | None
     protein_g: float
     carbohydrates_g: float
     fat_g: float
+    sugar_g: float
     entry_count: int
 
 
@@ -81,11 +107,15 @@ class ProgressSummary(BaseModel):
     period_start: date
     period_end: date
     exercise_minutes: int
+    exercise_minutes_last_7_days: int
     exercise_minutes_target: int
     exercise_calories: int
+    hydration_ml_today: int
+    hydration_target_ml: int | None
     latest_weight_kg: float | None
     latest_weight_at: datetime | None
     starting_weight_kg: float | None
     goal_weight_kg: float | None
     change_from_start_kg: float | None
+    change_last_30_days_kg: float | None
     weight_entries: list[WeightOutput]

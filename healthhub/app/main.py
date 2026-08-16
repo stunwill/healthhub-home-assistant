@@ -37,7 +37,7 @@ from .schemas import (
     QuickAddResult,
 )
 
-APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.2.0")
+APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.5.0")
 STATIC_DIR = Path(os.getenv("HEALTHHUB_STATIC_DIR", "/app/static"))
 OPTIONS_FILE = Path("/data/options.json")
 ACTIVE_PROFILE_FILE = Path(os.getenv("HEALTHHUB_ACTIVE_PROFILE_FILE", "/data/healthhub/active-profile.json"))
@@ -141,7 +141,10 @@ def list_profiles(db: DbSession, include_archived: bool = False) -> list[Profile
 
 @app.post("/api/v1/profiles", response_model=ProfileOutput, status_code=status.HTTP_201_CREATED)
 def create_profile(payload: ProfileCreate, db: DbSession) -> Profile:
-    profile = Profile(**payload.model_dump(mode="json"))
+    values = payload.model_dump(mode="json")
+    nutrition_fields = values.pop("nutrition_display_fields")
+    profile = Profile(**values)
+    profile.nutrition_display_fields = nutrition_fields
     db.add(profile)
     db.commit()
     db.refresh(profile)
@@ -157,6 +160,7 @@ def get_profile(profile_id: str, db: DbSession) -> Profile:
 def update_profile(profile_id: str, payload: ProfileUpdate, db: DbSession) -> Profile:
     profile = get_profile_or_404(db, profile_id)
     values = payload.model_dump(exclude_unset=True, mode="json")
+    nutrition_fields = values.pop("nutrition_display_fields", None)
     mode = values.get("exercise_credit_mode", profile.exercise_credit_mode)
     percentage = values.get("exercise_credit_percentage", profile.exercise_credit_percentage)
     if mode == "none":
@@ -166,6 +170,8 @@ def update_profile(profile_id: str, payload: ProfileUpdate, db: DbSession) -> Pr
     values["exercise_credit_percentage"] = percentage
     for field, value in values.items():
         setattr(profile, field, value)
+    if nutrition_fields is not None:
+        profile.nutrition_display_fields = nutrition_fields
     db.commit()
     db.refresh(profile)
     return profile
@@ -223,10 +229,7 @@ def list_foods(
     if q:
         pattern = f"%{q.strip().lower()}%"
         statement = statement.where(
-            or_(
-                func.lower(Food.name).like(pattern),
-                func.lower(func.coalesce(Food.brand, "")).like(pattern),
-            )
+            or_(func.lower(Food.name).like(pattern), func.lower(func.coalesce(Food.brand, "")).like(pattern))
         )
     statement = statement.order_by(Food.favourite.desc(), Food.name).limit(limit)
     return list(db.scalars(statement).all())
@@ -281,11 +284,7 @@ def list_diary_entries(
     return list(db.scalars(statement).all())
 
 
-@app.post(
-    "/api/v1/profiles/{profile_id}/diary",
-    response_model=DiaryEntryOutput,
-    status_code=status.HTTP_201_CREATED,
-)
+@app.post("/api/v1/profiles/{profile_id}/diary", response_model=DiaryEntryOutput, status_code=status.HTTP_201_CREATED)
 def create_diary_entry(profile_id: str, payload: DiaryEntryCreate, db: DbSession) -> DiaryEntry:
     profile = get_profile_or_404(db, profile_id)
     if profile.archived:
@@ -306,6 +305,7 @@ def create_diary_entry(profile_id: str, payload: DiaryEntryCreate, db: DbSession
         protein_g=scale_optional(food.protein_g, servings),
         carbohydrates_g=scale_optional(food.carbohydrates_g, servings),
         fat_g=scale_optional(food.fat_g, servings),
+        sugar_g=scale_optional(food.sugar_g, servings),
         source=food.source,
     )
     db.add(entry)
@@ -316,9 +316,7 @@ def create_diary_entry(profile_id: str, payload: DiaryEntryCreate, db: DbSession
 
 @app.delete("/api/v1/profiles/{profile_id}/diary/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_diary_entry(profile_id: str, entry_id: str, db: DbSession) -> Response:
-    entry = db.scalar(
-        select(DiaryEntry).where(DiaryEntry.id == entry_id, DiaryEntry.profile_id == profile_id)
-    )
+    entry = db.scalar(select(DiaryEntry).where(DiaryEntry.id == entry_id, DiaryEntry.profile_id == profile_id))
     if not entry:
         raise HTTPException(status_code=404, detail="Diary entry not found")
     db.delete(entry)
@@ -352,6 +350,7 @@ def daily_summary(
         protein_g=round(sum(entry.protein_g or 0 for entry in entries), 1),
         carbohydrates_g=round(sum(entry.carbohydrates_g or 0 for entry in entries), 1),
         fat_g=round(sum(entry.fat_g or 0 for entry in entries), 1),
+        sugar_g=round(sum(entry.sugar_g or 0 for entry in entries), 1),
         entry_count=len(entries),
     )
 
@@ -372,13 +371,10 @@ async def quick_add_search(
             name=food.name,
             subtitle=food.brand or food.serving_name,
             calories=food.calories,
-            nutrition_complete=all(
-                value is not None for value in (food.protein_g, food.carbohydrates_g, food.fat_g)
-            ),
+            nutrition_complete=all(value is not None for value in (food.protein_g, food.carbohydrates_g, food.fat_g)),
         )
         for food in foods
     ]
-
     options = load_options().get("foodhub", {})
     if options.get("enabled", True) and len(results) < limit:
         client = FoodHubClient(options.get("base_url", "http://dinnerhub:8099"))
@@ -453,6 +449,7 @@ def save_reviewed_nutrition_label(payload: NutritionLabelReviewCreate, db: DbSes
         protein_g=payload.protein_g,
         carbohydrates_g=payload.carbohydrates_g,
         fat_g=payload.fat_g,
+        sugar_g=payload.sugar_g,
         source="nutrition_label_review",
     )
     db.add(food)

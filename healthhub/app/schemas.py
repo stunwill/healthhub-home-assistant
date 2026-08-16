@@ -5,13 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .models import (
-    ExerciseCreditMode,
-    FoodKind,
-    MealPeriod,
-    MeasurementUnits,
-    NutritionDisplayMode,
-)
+from .models import ExerciseCreditMode, FoodKind, MealPeriod, MeasurementUnits, NutritionDisplayMode, NutritionField
 
 
 class ProfileBase(BaseModel):
@@ -28,6 +22,7 @@ class ProfileBase(BaseModel):
     exercise_credit_mode: ExerciseCreditMode = ExerciseCreditMode.NONE
     exercise_credit_percentage: int = Field(default=0, ge=0, le=100)
     nutrition_display_mode: NutritionDisplayMode = NutritionDisplayMode.SIMPLE
+    nutrition_display_fields: list[NutritionField] = Field(default_factory=lambda: [NutritionField.CALORIES], min_length=1)
     timezone: str = "Australia/Melbourne"
     measurement_units: MeasurementUnits = MeasurementUnits.METRIC
 
@@ -39,6 +34,11 @@ class ProfileBase(BaseModel):
         except ZoneInfoNotFoundError as exc:
             raise ValueError("Timezone must be a valid IANA timezone") from exc
         return value
+
+    @field_validator("nutrition_display_fields")
+    @classmethod
+    def unique_nutrition_fields(cls, values: list[NutritionField]) -> list[NutritionField]:
+        return list(dict.fromkeys(values))
 
     @model_validator(mode="after")
     def validate_credit_percentage(self) -> "ProfileBase":
@@ -67,6 +67,7 @@ class ProfileUpdate(BaseModel):
     exercise_credit_mode: ExerciseCreditMode | None = None
     exercise_credit_percentage: int | None = Field(default=None, ge=0, le=100)
     nutrition_display_mode: NutritionDisplayMode | None = None
+    nutrition_display_fields: list[NutritionField] | None = Field(default=None, min_length=1)
     timezone: str | None = None
     measurement_units: MeasurementUnits | None = None
 
@@ -80,6 +81,11 @@ class ProfileUpdate(BaseModel):
         except ZoneInfoNotFoundError as exc:
             raise ValueError("Timezone must be a valid IANA timezone") from exc
         return value
+
+    @field_validator("nutrition_display_fields")
+    @classmethod
+    def unique_nutrition_fields(cls, values: list[NutritionField] | None) -> list[NutritionField] | None:
+        return list(dict.fromkeys(values)) if values is not None else None
 
 
 class ProfileOutput(ProfileBase):
@@ -123,6 +129,7 @@ class FoodBase(BaseModel):
     protein_g: float | None = Field(default=None, ge=0, le=5000)
     carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
     fat_g: float | None = Field(default=None, ge=0, le=5000)
+    sugar_g: float | None = Field(default=None, ge=0, le=5000)
     favourite: bool = False
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -142,6 +149,7 @@ class FoodUpdate(BaseModel):
     protein_g: float | None = Field(default=None, ge=0, le=5000)
     carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
     fat_g: float | None = Field(default=None, ge=0, le=5000)
+    sugar_g: float | None = Field(default=None, ge=0, le=5000)
     favourite: bool | None = None
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -185,6 +193,7 @@ class DiaryEntryOutput(BaseModel):
     protein_g: float | None
     carbohydrates_g: float | None
     fat_g: float | None
+    sugar_g: float | None
     source: str
     created_at: datetime
     updated_at: datetime
@@ -200,6 +209,7 @@ class DailySummaryOutput(BaseModel):
     protein_g: float
     carbohydrates_g: float
     fat_g: float
+    sugar_g: float
     entry_count: int
 
 
@@ -225,6 +235,7 @@ class NutritionLabelReviewCreate(BaseModel):
     protein_g: float | None = Field(default=None, ge=0, le=5000)
     carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
     fat_g: float | None = Field(default=None, ge=0, le=5000)
+    sugar_g: float | None = Field(default=None, ge=0, le=5000)
     reviewed: bool
 
     @model_validator(mode="after")
