@@ -2,95 +2,59 @@
 
 HealthHub is a Home Assistant add-on for personal nutrition, calorie planning, activity goals and progress tracking, with a versioned integration to FoodHub.
 
-## Current development release: v0.6.0
+## Current development release: v0.7.0
 
-HealthHub v0.6.0 adds a reusable Food Library and spreadsheet paste import to the existing diary and planning workflows:
+HealthHub v0.7.0 extends the v0.6 Food Library with practical food capture, product identity, provenance and authoritative recipe nutrition:
 
-- profile-scoped daily food diary
-- persistent HealthHub food catalogue
-- calories, protein, carbohydrates, fat and optional sugar data
-- multi-select nutrition display fields per profile
-- predictive Quick Add for HealthHub foods
-- manual exercise, metric weight and water logging
-- exercise-credit-aware daily calorie budgets
-- hydration progress against an optional user-configured target
-- improved Progress view with seven-day exercise progress and weight trend visualisation
-- planned food entries with immutable nutrition snapshots
-- reusable composite foods, personal default servings and profile-specific recent/frequent foods
-- Foods → Import Foods spreadsheet paste with preview, validation, aliases and duplicate handling
-- functional Week view with planned versus consumed totals
-- daily, weekday and weekly recurrence rules
-- phone camera or existing-image nutrition-label capture with mandatory human review
+- spreadsheet paste, CSV upload and native XLSX upload through the same validation/preview/import pipeline
+- downloadable CSV and XLSX templates using canonical HealthHub columns
+- canonical nutrition bases for per serving, per 100 g and per 100 mL nutrition
+- local-first barcode lookup with EAN/GTIN validation and reusable product identifiers
+- external product search and barcode lookup through a provider abstraction, initially Open Food Facts
+- nutrition-label photo capture with local Tesseract OCR inside the HealthHub add-on
+- review-first OCR workflow with confidence and nutrition-consistency warnings
+- nutrition provenance, provider/source metadata and verification status
+- protection against lower-quality imports overwriting verified food data
+- FoodHub authoritative per-serving recipe nutrition ingestion through the versioned v1 contract
+- immutable consumed diary snapshots, so later food or FoodHub recipe updates do not rewrite historical consumption
 
-Profiles are data selectors, not secure accounts. Home Assistant is the trust boundary and HealthHub does not implement its own login, passwords, PINs, passkeys or account registration.
+Profiles remain data selectors, not secure accounts. Home Assistant is the trust boundary and HealthHub does not implement its own authentication.
 
-## Profile defaults
+## Import foods
 
-HealthHub is currently designed for the Australian household installation it serves. Profile setup therefore uses these defaults without asking the user to configure them:
+Open **Foods → Import & capture foods**. Spreadsheet paste, CSV and XLSX all use the same canonical mapping and validation rules. `name` is required; nutrition fields may be incomplete. Supported nutrition bases are `per_serving`, `per_100g` and `per_100ml`. Invalid negative or malformed values are rejected, while suspicious nutrient relationships are shown as review warnings.
 
-- timezone: `Australia/Melbourne`
-- measurement units: metric
+CSV supports UTF-8 and UTF-8 BOM. Common comma, semicolon, tab and pipe delimiters are detected where practical. XLSX workbooks detect non-empty worksheets and use the selected worksheet for preview and import. Uploads are limited to 5 MB and 10,000 rows.
 
-Nutrition display is independently selectable across Calories, Protein, Carbohydrates, Fat and Sugar. For example, a profile can show Calories + Sugar only.
+## Barcode and product lookup
 
-## Architecture
+Barcode lookup is local-first. HealthHub checks `food_identifiers` before any external request. Existing local products are reused rather than duplicated. When no local match exists, the configured product provider may supply a preview candidate. External data never saves automatically and must be reviewed first.
 
-HealthHub is a separate application and datastore from FoodHub. It does not read FoodHub's database directly. FoodHub remains the source of truth for shared recipes and scheduled household meals, while HealthHub owns personal profiles, nutrition foods, diary entries, exercise, weight, hydration, plans, recurrence and progress data.
+The initial provider is Open Food Facts behind the `ProductLookupProvider` abstraction. Provider failure does not block manual food creation, local search, file import or previously saved foods.
 
-Backend: Python 3.12, FastAPI, SQLAlchemy, Alembic and SQLite.
+## Nutrition-label capture and privacy
 
-Frontend: React 19, TypeScript and Vite.
+JPEG, PNG and WebP images up to 10 MB are accepted. OCR is performed locally with Tesseract in the HealthHub container. Nutrition-label images are not sent to a third-party OCR service by HealthHub. OCR text is normalised for common label and recognition issues and produces field confidence plus consistency warnings.
 
-Supported Home Assistant architectures: `aarch64` and `amd64`.
+The workflow is:
 
-## Data model
+**Image → local OCR → parse → normalise → confidence/warnings → user review → validation → duplicate check → save**
 
-v0.5.0 contains eight application tables:
-
-- `profiles`, profile identity and nutrition/activity preferences
-- `foods`, reusable nutrition and serving definitions
-- `diary_entries`, consumed items with immutable nutrition snapshots
-- `exercise_entries`, completed activity with user-supplied duration and calories burned
-- `weight_entries`, timestamped metric weight measurements
-- `water_entries`, profile-scoped hydration logs in millilitres
-- `planned_entries`, profile-specific planned food snapshots and status
-- `recurrence_rules`, simple daily, weekday and weekly planning rules
-
-Consumed diary entries and planned entries snapshot nutrition, including sugar where available, so later food edits do not silently rewrite historical or already-planned values.
-
-## Hydration
-
-Hydration targets are optional and user configured. HealthHub does not prescribe a target. Water can be logged in millilitres from Quick Add or Progress, including 250 mL, 500 mL and 750 mL shortcuts.
-
-## Planning and recurrence
-
-The Week view shows seven days of planned and consumed calories and lets a user add HealthHub foods to a specific date, time and meal period. Planned items can be marked consumed or skipped. Marking an item consumed creates a real diary entry from the planned nutrition snapshot.
-
-Recurrence supports daily, weekdays and weekly rules. Rules materialise planned entries for an eight-week horizon. Recurrence never marks food as consumed automatically.
-
-FoodHub scheduled household dinners and HealthHub personal plans remain separate sources of truth. HealthHub does not write directly to FoodHub schedules.
-
-## Exercise calorie credit
-
-Daily remaining calories use:
-
-`remaining = target - consumed food calories + credited exercise calories`
-
-Credit modes are no credit, full credit and percentage credit. HealthHub does not estimate exercise calories. Users enter calories from a trusted device, application or other source.
-
-## Nutrition-label capture
-
-The current workflow remains review-first:
-
-**Take/upload photo → store capture → review values → correct values → save food**
-
-JPEG, PNG and WebP files up to 10 MB are accepted. OCR/AI extraction is not enabled, so extracted values are never fabricated.
+OCR values are never treated as packaging-confirmed until the user has reviewed them. Reviewed records use packaging-label provenance and retain verification metadata.
 
 ## FoodHub compatibility
 
 HealthHub communicates with FoodHub only through versioned `/api/v1` interfaces and never reads the FoodHub database.
 
-FoodHub recipes without authoritative per-serving nutrition are not treated as zero-calorie foods and cannot be silently logged or planned as consumed nutrition.
+The current FoodHub v1 contract can expose authoritative per-serving recipe nutrition. HealthHub can consume that nutrition and maintain a linked Food Library record for future selections. Consumed diary entries continue to snapshot nutrition, so later FoodHub recipe changes affect future selections only.
+
+The current FoodHub v1 contract does **not** expose recipe ingredient quantities. HealthHub therefore does not pretend ingredient-level mapping/calculation is authoritative yet. The v0.7 schema includes the mapping foundation, but ingredient-level calculation remains unavailable until FoodHub exposes the required versioned ingredient data.
+
+## Architecture and data safety
+
+HealthHub keeps its own SQLite datastore and Alembic migrations. v0.7 adds product identifiers, canonical nutrition/provenance fields, FoodHub recipe links and ingredient-mapping foundations without resetting existing data. Existing foods, composites, profile preferences, import history, diary snapshots, plans, exercise, weight and hydration records are preserved.
+
+Production data lives under `/data/healthhub`. Home Assistant Ingress remains the default access path.
 
 ## Development
 
@@ -114,16 +78,6 @@ npm install
 npm run dev
 ```
 
-Full preflight:
-
-```bash
-./scripts/preflight.sh
-```
-
-## Home Assistant data and backups
-
-Production data lives under `/data/healthhub`. SQLite uses WAL mode, foreign keys and transactional writes. The app uses Home Assistant Ingress on port 8098 and is not exposed to the public internet by default.
-
 ## Roadmap
 
-A sensible next scope is CSV/XLSX import, nutrition-label OCR and barcode/product integrations, followed by authoritative FoodHub recipe nutrition mapping. Drag-and-drop planning, unscheduled meal trays, wearables and smart-scale imports remain later work.
+Future work includes meal-photo calorie estimation, improved automatic food-image recognition, wearable integration, smart-scale integration, additional product providers, nutrition data refresh workflows, richer ingredient/unit conversion, recipe serving/yield intelligence, Food Library export/backup and an optional household-shared custom product catalogue.
