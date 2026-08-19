@@ -11,6 +11,7 @@ depends_on = None
 
 def upgrade() -> None:
     with op.batch_alter_table("foods") as batch:
+        batch.add_column(sa.Column("serving_quantity", sa.Float(), nullable=True))
         batch.add_column(sa.Column("nutrition_basis", sa.String(length=20), nullable=True, server_default="per_serving"))
         batch.add_column(sa.Column("canonical_quantity", sa.Float(), nullable=True))
         batch.add_column(sa.Column("canonical_unit", sa.String(length=20), nullable=True))
@@ -22,6 +23,7 @@ def upgrade() -> None:
         batch.add_column(sa.Column("verified_at", sa.DateTime(timezone=True), nullable=True))
         batch.add_column(sa.Column("ocr_confidence", sa.String(length=30), nullable=True))
         batch.add_column(sa.Column("image_url", sa.String(length=500), nullable=True))
+    op.execute("UPDATE foods SET serving_quantity=serving_grams WHERE serving_grams IS NOT NULL")
     op.execute("UPDATE foods SET nutrition_basis='per_serving' WHERE nutrition_basis IS NULL")
     op.execute("UPDATE foods SET verification_status=CASE WHEN data_quality='packaging_confirmed' THEN 'verified' ELSE 'unverified' END WHERE verification_status IS NULL")
 
@@ -77,5 +79,5 @@ def downgrade() -> None:
     op.drop_index("ix_food_identifiers_food_id", table_name="food_identifiers")
     op.drop_table("food_identifiers")
     with op.batch_alter_table("foods") as batch:
-        for column in ("image_url", "ocr_confidence", "verified_at", "verification_status", "source_url", "source_identifier", "source_provider", "package_size", "canonical_unit", "canonical_quantity", "nutrition_basis"):
+        for column in ("image_url", "ocr_confidence", "verified_at", "verification_status", "source_url", "source_identifier", "source_provider", "package_size", "canonical_unit", "canonical_quantity", "nutrition_basis", "serving_quantity"):
             batch.drop_column(column)
