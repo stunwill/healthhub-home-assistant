@@ -18,7 +18,8 @@ from sqlalchemy.orm import Session
 from .database import DATABASE_PATH, ensure_data_dir, get_db
 from .domain import calorie_budget
 from .foodhub import FoodHubClient
-from .models import DiaryEntry, Food, Profile
+from .food_library import parse_tsv
+from .models import DiaryEntry, Food, FoodComponent, FoodPreference, ImportBatch, ImportItem, Profile, utc_now
 from .schemas import (
     ActiveProfileResponse,
     ActiveProfileSelection,
@@ -28,6 +29,8 @@ from .schemas import (
     DiaryEntryCreate,
     DiaryEntryOutput,
     FoodCreate,
+    CompositeFoodCreate,
+    FoodPreferenceUpdate,
     FoodOutput,
     FoodUpdate,
     NutritionLabelReviewCreate,
@@ -35,9 +38,12 @@ from .schemas import (
     ProfileOutput,
     ProfileUpdate,
     QuickAddResult,
+    ImportPreviewRequest,
+    ImportCommitRequest,
+    ImportPreviewOutput,
 )
 
-APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.5.0")
+APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.6.0")
 STATIC_DIR = Path(os.getenv("HEALTHHUB_STATIC_DIR", "/app/static"))
 OPTIONS_FILE = Path("/data/options.json")
 ACTIVE_PROFILE_FILE = Path(os.getenv("HEALTHHUB_ACTIVE_PROFILE_FILE", "/data/healthhub/active-profile.json"))
@@ -107,6 +113,10 @@ def get_food_or_404(db: Session, food_id: str) -> Food:
 
 def scale_optional(value: float | None, servings: float) -> float | None:
     return round(value * servings, 2) if value is not None else None
+
+
+def food_key(name: str, brand: str | None, serving_size: float | None, serving_unit: str | None) -> tuple[str, str, float | None, str]:
+    return (name.strip().lower(), (brand or "").strip().lower(), serving_size, (serving_unit or "serving").strip().lower())
 
 
 def local_day_bounds(target: date, timezone_name: str) -> tuple[datetime, datetime]:
@@ -218,6 +228,7 @@ def list_foods(
     db: DbSession,
     q: str | None = Query(default=None, min_length=1, max_length=180),
     favourite: bool | None = None,
+    profile_id: str | None = None,
     include_archived: bool = False,
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[Food]:
@@ -231,7 +242,14 @@ def list_foods(
         statement = statement.where(
             or_(func.lower(Food.name).like(pattern), func.lower(func.coalesce(Food.brand, "")).like(pattern))
         )
-    statement = statement.order_by(Food.favourite.desc(), Food.name).limit(limit)
+    if profile_id:
+        statement = statement.outerjoin(FoodPreference, FoodPreference.food_id == Food.id).where(
+            or_(FoodPreference.profile_id == profile_id, FoodPreference.profile_id.is_(None))
+        )
+        statement = statement.order_by(func.coalesce(FoodPreference.use_count, 0).desc(), func.coalesce(FoodPreference.last_used_at, Food.created_at).desc(), Food.favourite.desc(), Food.name)
+    else:
+        statement = statement.order_by(Food.favourite.desc(), Food.name)
+    statement = statement.limit(limit)
     return list(db.scalars(statement).all())
 
 
@@ -242,6 +260,103 @@ def create_food(payload: FoodCreate, db: DbSession) -> Food:
     db.commit()
     db.refresh(food)
     return food
+
+
+@app.post("/api/v1/foods/composite", response_model=FoodOutput, status_code=status.HTTP_201_CREATED)
+def create_composite_food(payload: CompositeFoodCreate, db: DbSession) -> Food:
+    components = [get_food_or_404(db, item.food_id) for item in payload.components]
+    if any(food.archived for food in components):
+        raise HTTPException(status_code=409, detail="Archived foods cannot be components")
+    values: dict[str, float | None] = {}
+    fields = ("calories", "protein_g", "carbohydrates_g", "fat_g", "sugar_g", "saturated_fat_g", "fibre_g", "sodium_mg", "calcium_mg", "iron_mg", "potassium_mg", "cholesterol_mg", "alcohol_g", "caffeine_mg")
+    for field in fields:
+        source_values = [getattr(food, field) for food, component in zip(components, payload.components) if getattr(food, field) is not None]
+        values[field] = round(sum(float(getattr(food, field) or 0) * component.quantity for food, component in zip(components, payload.components)), 2) if source_values else None
+    food = Food(name=payload.name, kind="composite", serving_name=payload.serving_name, serving_unit=payload.serving_unit, source="healthhub", data_quality="user_entered", notes=payload.notes, **values)
+    db.add(food)
+    db.flush()
+    for item in payload.components:
+        db.add(FoodComponent(composite_food_id=food.id, component_food_id=item.food_id, quantity=item.quantity, unit=item.unit))
+    db.commit()
+    db.refresh(food)
+    return food
+
+
+@app.put("/api/v1/profiles/{profile_id}/foods/{food_id}/preference")
+def update_food_preference(profile_id: str, food_id: str, payload: FoodPreferenceUpdate, db: DbSession) -> dict[str, object]:
+    get_profile_or_404(db, profile_id)
+    get_food_or_404(db, food_id)
+    preference = db.get(FoodPreference, {"profile_id": profile_id, "food_id": food_id})
+    if preference is None:
+        preference = FoodPreference(profile_id=profile_id, food_id=food_id)
+        db.add(preference)
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(preference, field, value)
+    db.commit()
+    return {"profile_id": profile_id, "food_id": food_id, "favourite": preference.favourite, "default_quantity": preference.default_quantity}
+
+
+@app.get("/api/v1/profiles/{profile_id}/foods/recent", response_model=list[FoodOutput])
+def recent_foods(profile_id: str, db: DbSession, limit: int = Query(default=12, ge=1, le=50)) -> list[Food]:
+    get_profile_or_404(db, profile_id)
+    return list(db.scalars(select(Food).join(FoodPreference).where(FoodPreference.profile_id == profile_id, FoodPreference.last_used_at.is_not(None)).order_by(FoodPreference.last_used_at.desc()).limit(limit)).all())
+
+
+@app.post("/api/v1/foods/import/preview", response_model=ImportPreviewOutput)
+def preview_food_import(payload: ImportPreviewRequest, db: DbSession) -> ImportPreviewOutput:
+    headers, mappings, rows = parse_tsv(payload.tsv, payload.mappings)
+    existing = {food_key(food.name, food.brand, food.serving_grams, food.serving_unit) for food in db.scalars(select(Food).where(Food.archived.is_(False))).all()}
+    duplicates = 0
+    for row in rows:
+        key = food_key(str(row.get("name", "")), str(row.get("brand") or ""), float(row["serving_size"]) if row.get("serving_size") else None, str(row.get("serving_unit") or "serving"))
+        row["_duplicate"] = key in existing
+        duplicates += int(row["_duplicate"])
+    return ImportPreviewOutput(headers=headers, mappings=mappings, total_rows=len(rows), valid_rows=sum(bool(row["_valid"]) for row in rows), warning_rows=sum(bool(row["_warnings"]) for row in rows), invalid_rows=sum(not row["_valid"] for row in rows), duplicate_rows=duplicates, rows=rows)
+
+
+@app.post("/api/v1/foods/import/commit")
+def commit_food_import(payload: ImportCommitRequest, db: DbSession) -> dict[str, object]:
+    batch = ImportBatch(source="spreadsheet")
+    db.add(batch)
+    db.flush()
+    for row_number, row in enumerate(payload.rows, start=2):
+        if not row.get("_valid", True):
+            batch.rejected_count += 1
+            errors = row.get("_errors", [])
+            message = "; ".join(str(item) for item in errors) if isinstance(errors, list) else "Invalid row"
+            db.add(ImportItem(batch_id=batch.id, row_number=row_number, action="rejected", message=message))
+            continue
+        name = str(row.get("name", "")).strip()
+        brand = str(row.get("brand") or "").strip() or None
+        serving_size = float(str(row["serving_size"])) if row.get("serving_size") not in (None, "") else None
+        unit = str(row.get("serving_unit") or "serving")
+        match = next((food for food in db.scalars(select(Food).where(Food.archived.is_(False))).all() if food_key(food.name, food.brand, food.serving_grams, food.serving_unit) == food_key(name, brand, serving_size, unit)), None)
+        if match and payload.duplicate_action == "skip":
+            batch.skipped_count += 1
+            db.add(ImportItem(batch_id=batch.id, row_number=row_number, food_id=match.id, action="skipped", message="Potential duplicate"))
+            continue
+        values: dict[str, object] = {"name": name, "brand": brand, "category": str(row.get("category") or "") or None, "serving_name": f"{serving_size:g} {unit}" if serving_size else f"1 {unit}", "serving_unit": unit, "serving_grams": serving_size, "calories": float(str(row.get("calories") or 0)), "source": "spreadsheet", "data_quality": "imported", "notes": str(row.get("notes") or "") or None}
+        aliases = {"carbs_g": "carbohydrates_g"}
+        for field in ("protein_g", "carbs_g", "fat_g", "saturated_fat_g", "sugar_g", "fibre_g", "sodium_mg", "calcium_mg", "iron_mg", "potassium_mg", "alcohol_g", "caffeine_mg"):
+            values[aliases.get(field, field)] = row.get(field)
+        if match and payload.duplicate_action == "update":
+            for field, value in values.items():
+                setattr(match, field, value)
+            batch.updated_count += 1
+            db.add(ImportItem(batch_id=batch.id, row_number=row_number, food_id=match.id, action="updated"))
+        else:
+            food = Food(**values)
+            db.add(food)
+            db.flush()
+            batch.created_count += 1
+            db.add(ImportItem(batch_id=batch.id, row_number=row_number, food_id=food.id, action="created"))
+    db.commit()
+    return {"batch_id": batch.id, "created": batch.created_count, "updated": batch.updated_count, "skipped": batch.skipped_count, "rejected": batch.rejected_count}
+
+
+@app.get("/api/v1/foods/import/template")
+def food_import_template() -> dict[str, str]:
+    return {"template": "\t".join(["name", "brand", "category", "serving_size", "serving_unit", "calories", "protein_g", "carbs_g", "fat_g", "saturated_fat_g", "sugar_g", "fibre_g", "sodium_mg", "calcium_mg", "iron_mg", "potassium_mg", "alcohol_g", "caffeine_mg", "notes"])}
 
 
 @app.get("/api/v1/foods/{food_id}", response_model=FoodOutput)
@@ -292,6 +407,7 @@ def create_diary_entry(profile_id: str, payload: DiaryEntryCreate, db: DbSession
     food = get_food_or_404(db, payload.food_id)
     if food.archived:
         raise HTTPException(status_code=409, detail="Archived foods cannot be added to the diary")
+    preference = db.get(FoodPreference, {"profile_id": profile_id, "food_id": food.id})
     servings = payload.servings
     entry = DiaryEntry(
         profile_id=profile.id,
@@ -306,8 +422,23 @@ def create_diary_entry(profile_id: str, payload: DiaryEntryCreate, db: DbSession
         carbohydrates_g=scale_optional(food.carbohydrates_g, servings),
         fat_g=scale_optional(food.fat_g, servings),
         sugar_g=scale_optional(food.sugar_g, servings),
+        saturated_fat_g=scale_optional(food.saturated_fat_g, servings),
+        fibre_g=scale_optional(food.fibre_g, servings),
+        sodium_mg=scale_optional(food.sodium_mg, servings),
+        calcium_mg=scale_optional(food.calcium_mg, servings),
+        iron_mg=scale_optional(food.iron_mg, servings),
+        potassium_mg=scale_optional(food.potassium_mg, servings),
+        cholesterol_mg=scale_optional(food.cholesterol_mg, servings),
+        alcohol_g=scale_optional(food.alcohol_g, servings),
+        caffeine_mg=scale_optional(food.caffeine_mg, servings),
         source=food.source,
     )
+    if preference is None:
+        preference = FoodPreference(profile_id=profile_id, food_id=food.id, use_count=1, last_used_at=utc_now())
+        db.add(preference)
+    else:
+        preference.use_count += 1
+        preference.last_used_at = utc_now()
     db.add(entry)
     db.commit()
     db.refresh(entry)
@@ -360,9 +491,10 @@ async def quick_add_search(
     db: DbSession,
     q: str = Query(min_length=2, max_length=180),
     limit: int = Query(default=12, ge=1, le=30),
+    profile_id: str | None = None,
 ) -> list[QuickAddResult]:
     local_limit = max(1, min(limit, 12))
-    foods = list_foods(db=db, q=q, limit=local_limit)
+    foods = list_foods(db=db, q=q, profile_id=profile_id, limit=local_limit)
     results = [
         QuickAddResult(
             id=food.id,

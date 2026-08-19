@@ -33,3 +33,8 @@ def test_migrations_create_current_schema(tmp_path: Path, monkeypatch) -> None: 
     assert "sugar_g" in food_columns
     assert "sugar_g" in diary_columns
     assert "sugar_g" in planned_columns
+    assert "category" in food_columns
+    assert "data_quality" in food_columns
+    assert "food_components" in tables
+    assert "food_preferences" in tables
+    assert "import_batches" in tables
