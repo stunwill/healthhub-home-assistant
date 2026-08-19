@@ -4,9 +4,10 @@ import csv
 import io
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
 
 from .food_library import IMPORT_FIELDS, detect_mappings, parse_rows
 
@@ -109,7 +110,7 @@ def template_csv() -> str:
 
 def template_xlsx_bytes() -> bytes:
     workbook = Workbook()
-    sheet = workbook.active
+    sheet = cast(Worksheet, workbook.active)
     sheet.title = "Foods"
     sheet.append(IMPORT_FIELDS)
     sheet.append(["Example cereal", "Example brand", "Breakfast cereal", 40, "g", "per_100g", 100, "g", 370, 9, 70, 4, 1, 18, 8, 450, 120, 8, 300, 0, 0, "Example only"])
