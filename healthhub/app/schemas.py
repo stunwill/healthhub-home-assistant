@@ -71,6 +71,22 @@ class ProfileUpdate(BaseModel):
     timezone: str | None = None
     measurement_units: MeasurementUnits | None = None
 
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("Timezone must be a valid IANA timezone") from exc
+        return value
+
+    @field_validator("nutrition_display_fields")
+    @classmethod
+    def unique_nutrition_fields(cls, values: list[NutritionField] | None) -> list[NutritionField] | None:
+        return list(dict.fromkeys(values)) if values is not None else None
+
 
 class ProfileOutput(ProfileBase):
     model_config = ConfigDict(from_attributes=True)
@@ -108,6 +124,7 @@ class FoodBase(BaseModel):
     kind: FoodKind = FoodKind.FOOD
     serving_name: str = Field(default="1 serve", min_length=1, max_length=100)
     serving_unit: str = Field(default="serving", min_length=1, max_length=40)
+    serving_quantity: float | None = Field(default=None, gt=0, le=10000)
     serving_grams: float | None = Field(default=None, gt=0, le=10000)
     nutrition_basis: str = Field(default="per_serving", pattern="^(per_serving|per_100g|per_100ml)$")
     canonical_quantity: float | None = Field(default=None, gt=0, le=10000)
@@ -156,6 +173,7 @@ class FoodUpdate(BaseModel):
     category: str | None = Field(default=None, max_length=80)
     serving_name: str | None = Field(default=None, min_length=1, max_length=100)
     serving_unit: str | None = Field(default=None, max_length=40)
+    serving_quantity: float | None = Field(default=None, gt=0, le=10000)
     serving_grams: float | None = Field(default=None, gt=0, le=10000)
     nutrition_basis: str | None = Field(default=None, pattern="^(per_serving|per_100g|per_100ml)$")
     canonical_quantity: float | None = Field(default=None, gt=0, le=10000)
@@ -230,6 +248,10 @@ class ImportPreviewOutput(BaseModel):
     invalid_rows: int
     duplicate_rows: int
     rows: list[dict[str, object]]
+    source_type: str | None = None
+    source_name: str | None = None
+    sheet_names: list[str] = Field(default_factory=list)
+    selected_sheet: str | None = None
 
 
 class ProductCandidate(BaseModel):
@@ -340,6 +362,8 @@ class NutritionLabelReviewCreate(BaseModel):
     brand: str | None = Field(default=None, max_length=120)
     kind: FoodKind = FoodKind.FOOD
     serving_name: str = Field(min_length=1, max_length=100)
+    serving_quantity: float | None = Field(default=None, gt=0, le=10000)
+    serving_unit: str = Field(default="serving", min_length=1, max_length=40)
     serving_grams: float | None = Field(default=None, gt=0, le=10000)
     nutrition_basis: str = Field(default="per_serving", pattern="^(per_serving|per_100g|per_100ml)$")
     energy_kj: float | None = Field(default=None, ge=0, le=100000)
