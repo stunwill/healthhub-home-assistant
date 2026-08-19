@@ -91,20 +91,26 @@ def parse_nutrition_text(text: str) -> NutritionExtraction:
         extraction.warnings.append("Saturated fat exceeds total fat")
     if isinstance(carbs, float) and isinstance(sugar, float) and sugar > carbs:
         extraction.warnings.append("Sugars exceed total carbohydrate")
-    if energy_kj is not None and isinstance(extraction.values.get("calories"), float):
+    calories_value = extraction.values.get("calories")
+    if energy_kj is not None and isinstance(calories_value, float):
         expected = energy_kj / 4.184
-        if expected and abs(float(extraction.values["calories"]) - expected) / expected > 0.12:
+        if expected and abs(calories_value - expected) / expected > 0.12:
             extraction.warnings.append("kJ and kcal values do not reconcile closely")
-    if extraction.values.get("sodium_mg") is not None and float(extraction.values["sodium_mg"]) > 50000:
+    sodium_value = extraction.values.get("sodium_mg")
+    if isinstance(sodium_value, float) and sodium_value > 50000:
         extraction.warnings.append("Sodium value is unusually high; verify mg/g units")
     return extraction
 
 
 def validate_nutrition_consistency(values: dict[str, float | None]) -> list[str]:
     warnings: list[str] = []
-    if values.get("saturated_fat_g") is not None and values.get("fat_g") is not None and values["saturated_fat_g"] > values["fat_g"]:  # type: ignore[operator]
+    saturated = values.get("saturated_fat_g")
+    fat = values.get("fat_g")
+    sugar = values.get("sugar_g")
+    carbohydrates = values.get("carbohydrates_g")
+    if saturated is not None and fat is not None and saturated > fat:
         warnings.append("Saturated fat exceeds total fat")
-    if values.get("sugar_g") is not None and values.get("carbohydrates_g") is not None and values["sugar_g"] > values["carbohydrates_g"]:  # type: ignore[operator]
+    if sugar is not None and carbohydrates is not None and sugar > carbohydrates:
         warnings.append("Sugars exceed total carbohydrate")
     kj = values.get("energy_kj")
     kcal = values.get("calories")
