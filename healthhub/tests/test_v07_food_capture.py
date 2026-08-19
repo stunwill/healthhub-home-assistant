@@ -30,7 +30,8 @@ def test_xlsx_selects_non_empty_worksheet() -> None:
     foods = workbook.create_sheet("Foods")
     foods.append(["name", "calories"])
     foods.append(["Apple", 52])
-    buffer = io.BytesIO(); workbook.save(buffer)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
     parsed = parse_xlsx_bytes(buffer.getvalue(), "foods.xlsx", sheet_name="Foods")
     assert parsed.sheet_names == ["Foods"]
     assert parsed.selected_sheet == "Foods"
