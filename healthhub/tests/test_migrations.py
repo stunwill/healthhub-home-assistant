@@ -35,8 +35,9 @@ def test_migrations_create_current_schema(tmp_path: Path, monkeypatch) -> None: 
         assert column in food_columns
 
 
-def test_upgrade_from_v06_preserves_food_and_diary_data(tmp_path: Path) -> None:
+def test_upgrade_from_v06_preserves_food_and_diary_data(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     database = tmp_path / "v06-upgrade.db"
+    monkeypatch.delenv("HEALTHHUB_DATABASE_URL", raising=False)
     config = _config(database)
     command.upgrade(config, "0006_food_library_imports")
     engine = create_engine(f"sqlite:///{database}")
