@@ -6,11 +6,11 @@ import os
 from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-import pytesseract
+import pytesseract  # type: ignore[import-untyped]
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -675,9 +675,9 @@ async def upload_nutrition_label(image: Annotated[UploadFile, File(...)]) -> dic
     if len(data) > MAX_CAPTURE_BYTES:
         raise HTTPException(status_code=413, detail="Nutrition-label images must be 10 MB or smaller")
     try:
-        pil = Image.open(io.BytesIO(data))
-        pil.verify()
-        pil = Image.open(io.BytesIO(data)).convert("RGB")
+        source_image = Image.open(io.BytesIO(data))
+        source_image.verify()
+        pil: Any = Image.open(io.BytesIO(data)).convert("RGB")
     except (UnidentifiedImageError, OSError) as exc:
         raise HTTPException(status_code=422, detail="Uploaded file is not a valid supported image") from exc
     CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
