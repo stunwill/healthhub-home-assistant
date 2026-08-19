@@ -100,6 +100,7 @@ class Food(Base):
     kind: Mapped[str] = mapped_column(String(20), default=FoodKind.FOOD.value, index=True)
     serving_name: Mapped[str] = mapped_column(String(100), default="1 serve")
     serving_unit: Mapped[str] = mapped_column(String(40), default="serving")
+    serving_quantity: Mapped[float | None] = mapped_column(Float)
     serving_grams: Mapped[float | None] = mapped_column(Float)
     nutrition_basis: Mapped[str] = mapped_column(String(20), default="per_serving")
     canonical_quantity: Mapped[float | None] = mapped_column(Float)
