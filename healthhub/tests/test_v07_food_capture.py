@@ -73,5 +73,5 @@ def test_ocr_less_than_and_bad_relationship_warning() -> None:
 
 
 def test_valid_ean13_and_invalid_checksum() -> None:
-    assert valid_barcode("9300675010786") is True
+    assert valid_barcode("9300675010788") is True
     assert valid_barcode("9300675010781") is False
