@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.7.0 - Food Capture, Product Lookup & Recipe Nutrition
+
+### Added
+
+- Added CSV and native XLSX upload through the existing Food Library validation, mapping, duplicate-preview and import-batch pipeline.
+- Added downloadable CSV/XLSX templates and canonical nutrition basis support for per serving, per 100 g and per 100 mL values.
+- Added barcode identifiers, local-first barcode lookup, checksum validation and unknown-barcode create flow.
+- Added a provider abstraction for external product lookup with Open Food Facts as the initial provider.
+- Added local nutrition-label OCR using Tesseract inside the HealthHub add-on, with normalisation, confidence, review warnings and mandatory human confirmation.
+- Added food provenance fields for provider/source identifiers, verification, OCR confidence, source URL and product image references.
+- Added source-precedence protection so lower-quality imports do not silently overwrite higher-quality verified nutrition.
+- Added authoritative FoodHub per-serving recipe nutrition ingestion using the current versioned FoodHub v1 contract.
+- Added FoodHub recipe-link and ingredient-mapping foundation tables while keeping historical diary nutrition immutable.
+
+### Changed
+
+- Food Library search can match category and barcode as well as name and brand.
+- Per-100 g products can retain canonical nutrition while user servings scale diary nutrition without rewriting the product record.
+- CI now runs pull-request checks for PRs targeting `main` and push checks for `main`, avoiding duplicate feature-branch suites.
+
+### Privacy and offline behaviour
+
+- Nutrition-label OCR runs locally. HealthHub does not send captured label images to a third-party OCR service.
+- External product provider failure does not block local foods, manual entry, file import, barcode local lookup or previously stored products.
+
+### FoodHub limitation
+
+- FoodHub currently exposes authoritative per-serving recipe nutrition through v1 but does not expose ingredient quantities through the versioned contract. Ingredient-level mapping/calculation remains unavailable until FoodHub supplies that data. HealthHub does not scrape or invent it.
+
+### Migration and compatibility
+
+- Added Alembic migration `0007_food_capture_products` without resetting existing data.
+- Existing v0.6 foods, composites, profile preferences, import history, diary snapshots, planned entries, exercise, weight and hydration data are preserved.
+
 ## 0.6.0 - Food Library & Spreadsheet Import
 
 ### Added
