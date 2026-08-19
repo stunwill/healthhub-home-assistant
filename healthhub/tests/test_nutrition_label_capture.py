@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from app.database import Base, engine
 from app.main import app
@@ -19,15 +21,22 @@ def setup_function() -> None:
             path.unlink()
 
 
+def valid_png_bytes() -> bytes:
+    buffer = io.BytesIO()
+    Image.new("RGB", (32, 32), "white").save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 def test_label_upload_requires_review_before_food_save() -> None:
     uploaded = client.post(
         "/api/v1/capture/nutrition-label",
-        files={"image": ("label.png", b"fake-image-bytes", "image/png")},
+        files={"image": ("label.png", valid_png_bytes(), "image/png")},
     )
     assert uploaded.status_code == 202
     payload = uploaded.json()
     assert payload["review_required"] is True
-    assert payload["extraction"] is None
+    assert isinstance(payload["extraction"], dict)
+    assert payload["status"] == "awaiting_review"
 
     rejected = client.post(
         "/api/v1/capture/nutrition-label/review",
@@ -64,8 +73,17 @@ def test_label_upload_requires_review_before_food_save() -> None:
         },
     )
     assert saved.status_code == 201
-    assert saved.json()["source"] == "nutrition_label_review"
+    assert saved.json()["source"] == "packaging_label"
+    assert saved.json()["verification_status"] == "verified"
     assert saved.json()["calories"] == 148
+
+
+def test_label_upload_rejects_invalid_image_bytes() -> None:
+    response = client.post(
+        "/api/v1/capture/nutrition-label",
+        files={"image": ("label.png", b"not-an-image", "image/png")},
+    )
+    assert response.status_code == 422
 
 
 def test_label_upload_rejects_unsupported_file_type() -> None:
