@@ -71,9 +71,7 @@ class Profile(Base):
     exercise_credit_mode: Mapped[str] = mapped_column(String(20), default=ExerciseCreditMode.NONE.value)
     exercise_credit_percentage: Mapped[int] = mapped_column(Integer, default=0)
     nutrition_display_mode: Mapped[str] = mapped_column(String(20), default=NutritionDisplayMode.SIMPLE.value)
-    _nutrition_display_fields: Mapped[str] = mapped_column(
-        "nutrition_display_fields", String(100), default=NutritionField.CALORIES.value
-    )
+    _nutrition_display_fields: Mapped[str] = mapped_column("nutrition_display_fields", String(100), default=NutritionField.CALORIES.value)
     timezone: Mapped[str] = mapped_column(String(100), default="Australia/Melbourne")
     measurement_units: Mapped[str] = mapped_column(String(20), default=MeasurementUnits.METRIC.value)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
@@ -102,7 +100,12 @@ class Food(Base):
     kind: Mapped[str] = mapped_column(String(20), default=FoodKind.FOOD.value, index=True)
     serving_name: Mapped[str] = mapped_column(String(100), default="1 serve")
     serving_unit: Mapped[str] = mapped_column(String(40), default="serving")
+    serving_quantity: Mapped[float | None] = mapped_column(Float)
     serving_grams: Mapped[float | None] = mapped_column(Float)
+    nutrition_basis: Mapped[str] = mapped_column(String(20), default="per_serving")
+    canonical_quantity: Mapped[float | None] = mapped_column(Float)
+    canonical_unit: Mapped[str | None] = mapped_column(String(20))
+    package_size: Mapped[str | None] = mapped_column(String(80))
     energy_kj: Mapped[float | None] = mapped_column(Float)
     calories: Mapped[float] = mapped_column(Float)
     protein_g: Mapped[float | None] = mapped_column(Float)
@@ -120,6 +123,13 @@ class Food(Base):
     caffeine_mg: Mapped[float | None] = mapped_column(Float)
     source: Mapped[str] = mapped_column(String(40), default="manual", index=True)
     data_quality: Mapped[str] = mapped_column(String(40), default="user_entered", index=True)
+    source_provider: Mapped[str | None] = mapped_column(String(80))
+    source_identifier: Mapped[str | None] = mapped_column(String(200))
+    source_url: Mapped[str | None] = mapped_column(String(500))
+    verification_status: Mapped[str] = mapped_column(String(30), default="unverified")
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ocr_confidence: Mapped[str | None] = mapped_column(String(30))
+    image_url: Mapped[str | None] = mapped_column(String(500))
     favourite: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     notes: Mapped[str | None] = mapped_column(Text)
@@ -128,8 +138,43 @@ class Food(Base):
 
     diary_entries: Mapped[list[DiaryEntry]] = relationship(back_populates="food")
     components: Mapped[list[FoodComponent]] = relationship(back_populates="composite", cascade="all, delete-orphan", foreign_keys="FoodComponent.composite_food_id")
+    identifiers: Mapped[list[FoodIdentifier]] = relationship(back_populates="food", cascade="all, delete-orphan")
 
     __table_args__ = (Index("ix_foods_search", "archived", "name", "brand"),)
+
+
+class FoodIdentifier(Base):
+    __tablename__ = "food_identifiers"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    food_id: Mapped[str] = mapped_column(ForeignKey("foods.id", ondelete="CASCADE"), index=True)
+    identifier_type: Mapped[str] = mapped_column(String(20))
+    value: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    food: Mapped[Food] = relationship(back_populates="identifiers")
+    __table_args__ = (UniqueConstraint("identifier_type", "value", name="uq_food_identifier_type_value"),)
+
+
+class FoodHubRecipeLink(Base):
+    __tablename__ = "foodhub_recipe_links"
+
+    foodhub_recipe_id: Mapped[str] = mapped_column(String(120), primary_key=True)
+    food_id: Mapped[str] = mapped_column(ForeignKey("foods.id", ondelete="CASCADE"), unique=True)
+    recipe_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    nutrition_status: Mapped[str] = mapped_column(String(30), default="unavailable")
+    last_synced_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
+class FoodHubIngredientMapping(Base):
+    __tablename__ = "foodhub_ingredient_mappings"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    ingredient_key: Mapped[str] = mapped_column(String(200), unique=True)
+    ingredient_name: Mapped[str] = mapped_column(String(200))
+    food_id: Mapped[str] = mapped_column(ForeignKey("foods.id", ondelete="CASCADE"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
 
 
 class DiaryEntry(Base):
@@ -163,7 +208,6 @@ class DiaryEntry(Base):
 
     profile: Mapped[Profile] = relationship(back_populates="diary_entries")
     food: Mapped[Food | None] = relationship(back_populates="diary_entries")
-
     __table_args__ = (Index("ix_diary_profile_consumed", "profile_id", "consumed_at"),)
 
 
@@ -191,7 +235,6 @@ class FoodPreference(Base):
     use_count: Mapped[int] = mapped_column(Integer, default=0)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
-
     __table_args__ = (UniqueConstraint("profile_id", "food_id", name="uq_food_preferences_profile_food"),)
 
 
@@ -200,6 +243,7 @@ class ImportBatch(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     source: Mapped[str] = mapped_column(String(40), default="spreadsheet")
+    source_name: Mapped[str | None] = mapped_column(String(255))
     status: Mapped[str] = mapped_column(String(20), default="completed")
     created_count: Mapped[int] = mapped_column(Integer, default=0)
     updated_count: Mapped[int] = mapped_column(Integer, default=0)

@@ -1,5 +1,5 @@
 ARG BUILD_ARCH=aarch64
-ARG BUILD_VERSION=0.4.1
+ARG BUILD_VERSION=0.7.0
 
 FROM node:22-alpine AS frontend
 WORKDIR /frontend
@@ -26,6 +26,8 @@ ENV HEALTHHUB_VERSION="${BUILD_VERSION}" \
     HEALTHHUB_STATIC_DIR="/app/static" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
+
+RUN apk add --no-cache tesseract-ocr tesseract-ocr-data-eng
 
 WORKDIR /app
 COPY requirements.txt ./

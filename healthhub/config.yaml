@@ -1,5 +1,5 @@
 name: HealthHub
-version: "0.6.0"
+version: "0.7.0"
 slug: healthhub
 description: Personal nutrition, activity, goals and progress tracking for Home Assistant with FoodHub integration.
 url: https://github.com/stunwill/healthhub-home-assistant
@@ -20,9 +20,17 @@ options:
   foodhub:
     enabled: true
     base_url: http://dinnerhub:8099
+  product_lookup:
+    enabled: true
+    provider: open_food_facts
+    base_url: https://world.openfoodfacts.org
 schema:
   locale: str
   timezone: str
   foodhub:
     enabled: bool
+    base_url: str
+  product_lookup:
+    enabled: bool
+    provider: str
     base_url: str
