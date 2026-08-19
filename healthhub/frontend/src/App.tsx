@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import ProgressView from './ProgressView'
 import WeekView from './WeekView'
+import FoodImportView from './FoodImportView'
 
 type NutritionField = 'calories' | 'protein' | 'carbohydrates' | 'fat' | 'sugar'
 
@@ -126,7 +127,7 @@ function NutritionMultiSelect({ value, onChange }: { value: NutritionField[]; on
 export default function App() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
-  const [view, setView] = useState<'today' | 'week' | 'progress' | 'settings'>('today')
+  const [view, setView] = useState<'today' | 'week' | 'progress' | 'settings' | 'food-import'>('today')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
@@ -343,6 +344,7 @@ export default function App() {
       </section>
       : view === 'week' && activeProfileId ? <WeekView profileId={activeProfileId} onNotice={setNotice} />
       : view === 'progress' && activeProfileId ? <ProgressView profileId={activeProfileId} onNotice={setNotice} onActivityChanged={() => loadToday(activeProfileId)} />
+      : view === 'food-import' ? <FoodImportView onNotice={setNotice} />
       : view === 'settings' ? <section><p className="eyebrow">Settings</p><h1>Foods & preferences</h1>
         {activeProfile && <section className="planner-card"><h2>{activeProfile.display_name} profile preferences</h2><label>Nutrition display<NutritionMultiSelect value={activeProfile.nutrition_display_fields} onChange={(fields) => setProfiles((current) => current.map((profile) => profile.id === activeProfile.id ? { ...profile, nutrition_display_fields: fields } : profile))} /></label><label>Hydration target (mL, optional)<input inputMode="numeric" value={activeProfile.hydration_target_ml ?? ''} onChange={(e) => setProfiles((current) => current.map((profile) => profile.id === activeProfile.id ? { ...profile, hydration_target_ml: e.target.value === '' ? null : Number(e.target.value) } : profile))} /></label><button className="quick-add" onClick={() => void saveProfilePreferences()}>Save profile preferences</button><p className="muted">Timezone is fixed to Australia/Melbourne and measurements are metric.</p></section>}
         <p>Add foods from Australian packaging or other trusted sources. Values are stored per serving and can be edited later through the API.</p><div className="food-form"><label>Name<input value={foodDraft.name} onChange={(e) => setFoodDraft({ ...foodDraft, name: e.target.value })} /></label><label>Brand<input value={foodDraft.brand} onChange={(e) => setFoodDraft({ ...foodDraft, brand: e.target.value })} /></label><label>Serving<input value={foodDraft.serving_name} onChange={(e) => setFoodDraft({ ...foodDraft, serving_name: e.target.value })} /></label><label>Serving grams<input inputMode="decimal" value={foodDraft.serving_grams} onChange={(e) => setFoodDraft({ ...foodDraft, serving_grams: e.target.value })} /></label><label>Energy (kJ)<input inputMode="decimal" value={foodDraft.energy_kj} onChange={(e) => setFoodDraft({ ...foodDraft, energy_kj: e.target.value })} /></label><label>Calories (kcal)<input inputMode="decimal" value={foodDraft.calories} onChange={(e) => setFoodDraft({ ...foodDraft, calories: e.target.value })} /></label><label>Protein (g)<input inputMode="decimal" value={foodDraft.protein_g} onChange={(e) => setFoodDraft({ ...foodDraft, protein_g: e.target.value })} /></label><label>Carbohydrates (g)<input inputMode="decimal" value={foodDraft.carbohydrates_g} onChange={(e) => setFoodDraft({ ...foodDraft, carbohydrates_g: e.target.value })} /></label><label>Fat (g)<input inputMode="decimal" value={foodDraft.fat_g} onChange={(e) => setFoodDraft({ ...foodDraft, fat_g: e.target.value })} /></label><label>Sugar (g)<input inputMode="decimal" value={foodDraft.sugar_g} onChange={(e) => setFoodDraft({ ...foodDraft, sugar_g: e.target.value })} /></label></div><button className="quick-add" disabled={savingFood} onClick={() => void saveFood()}>{savingFood ? 'Saving…' : 'Save food'}</button>

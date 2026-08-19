@@ -2,9 +2,9 @@
 
 HealthHub is a Home Assistant add-on for personal nutrition, calorie planning, activity goals and progress tracking, with a versioned integration to FoodHub.
 
-## Current development release: v0.5.0
+## Current development release: v0.6.0
 
-HealthHub v0.5.0 adds hydration tracking, flexible nutrition display preferences and richer progress visualisation to the existing diary and planning workflows:
+HealthHub v0.6.0 adds a reusable Food Library and spreadsheet paste import to the existing diary and planning workflows:
 
 - profile-scoped daily food diary
 - persistent HealthHub food catalogue
@@ -16,6 +16,8 @@ HealthHub v0.5.0 adds hydration tracking, flexible nutrition display preferences
 - hydration progress against an optional user-configured target
 - improved Progress view with seven-day exercise progress and weight trend visualisation
 - planned food entries with immutable nutrition snapshots
+- reusable composite foods, personal default servings and profile-specific recent/frequent foods
+- Foods → Import Foods spreadsheet paste with preview, validation, aliases and duplicate handling
 - functional Week view with planned versus consumed totals
 - daily, weekday and weekly recurrence rules
 - phone camera or existing-image nutrition-label capture with mandatory human review
@@ -124,4 +126,4 @@ Production data lives under `/data/healthhub`. SQLite uses WAL mode, foreign key
 
 ## Roadmap
 
-A sensible next scope is richer food entry and FoodHub nutrition integration, followed by barcode/OCR integrations. Drag-and-drop planning, unscheduled meal trays, wearables and smart-scale imports remain later work.
+A sensible next scope is CSV/XLSX import, nutrition-label OCR and barcode/product integrations, followed by authoritative FoodHub recipe nutrition mapping. Drag-and-drop planning, unscheduled meal trays, wearables and smart-scale imports remain later work.

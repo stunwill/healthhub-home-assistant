@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0 - Food Library & Spreadsheet Import
+
+### Added
+
+- Extended the shared HealthHub food catalogue with categories, serving units, nutrition quality/source status and additional micronutrients.
+- Added idempotent initial foods for Stu, with estimated and packaging-confirmed values clearly distinguished.
+- Added reusable composite foods with component quantities and calculated nutrition.
+- Added profile-scoped food preferences, recent-use tracking, favourites and personal defaults without changing shared food records.
+- Added TSV spreadsheet paste preview, alias-based column mapping, validation, duplicate detection, bulk import results and import batch tracking.
+- Added the initial Foods import UI and documentation for spreadsheet workflows.
+
+### Migration and compatibility
+
+- Added Alembic migration `0006_food_library_imports`; existing foods, diary snapshots, profiles, plans, exercise, weight and hydration data are preserved.
+- FoodHub remains a versioned external adapter and does not share or duplicate HealthHub's database.
+
+### Deferred
+
+- CSV/XLSX uploads, barcode/product databases, OCR extraction and full FoodHub recipe nutrition mapping remain roadmap items.
+
 ## 0.5.0 - Hydration & Progress Visualisation
 
 ### Added

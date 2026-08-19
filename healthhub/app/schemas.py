@@ -121,15 +121,27 @@ class CalorieBudgetOutput(BaseModel):
 class FoodBase(BaseModel):
     name: str = Field(min_length=1, max_length=180)
     brand: str | None = Field(default=None, max_length=120)
+    category: str | None = Field(default=None, max_length=80)
     kind: FoodKind = FoodKind.FOOD
     serving_name: str = Field(default="1 serve", min_length=1, max_length=100)
+    serving_unit: str = Field(default="serving", min_length=1, max_length=40)
     serving_grams: float | None = Field(default=None, gt=0, le=10000)
     energy_kj: float | None = Field(default=None, ge=0, le=100000)
     calories: float = Field(ge=0, le=25000)
     protein_g: float | None = Field(default=None, ge=0, le=5000)
     carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
     fat_g: float | None = Field(default=None, ge=0, le=5000)
+    saturated_fat_g: float | None = Field(default=None, ge=0, le=5000)
     sugar_g: float | None = Field(default=None, ge=0, le=5000)
+    fibre_g: float | None = Field(default=None, ge=0, le=5000)
+    sodium_mg: float | None = Field(default=None, ge=0, le=100000)
+    calcium_mg: float | None = Field(default=None, ge=0, le=100000)
+    iron_mg: float | None = Field(default=None, ge=0, le=10000)
+    potassium_mg: float | None = Field(default=None, ge=0, le=100000)
+    cholesterol_mg: float | None = Field(default=None, ge=0, le=100000)
+    alcohol_g: float | None = Field(default=None, ge=0, le=5000)
+    caffeine_mg: float | None = Field(default=None, ge=0, le=100000)
+    data_quality: str = Field(default="user_entered", min_length=1, max_length=40)
     favourite: bool = False
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -141,15 +153,27 @@ class FoodCreate(FoodBase):
 class FoodUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=180)
     brand: str | None = Field(default=None, max_length=120)
+    category: str | None = Field(default=None, max_length=80)
     kind: FoodKind | None = None
     serving_name: str | None = Field(default=None, min_length=1, max_length=100)
+    serving_unit: str | None = Field(default=None, min_length=1, max_length=40)
     serving_grams: float | None = Field(default=None, gt=0, le=10000)
     energy_kj: float | None = Field(default=None, ge=0, le=100000)
     calories: float | None = Field(default=None, ge=0, le=25000)
     protein_g: float | None = Field(default=None, ge=0, le=5000)
     carbohydrates_g: float | None = Field(default=None, ge=0, le=5000)
     fat_g: float | None = Field(default=None, ge=0, le=5000)
+    saturated_fat_g: float | None = Field(default=None, ge=0, le=5000)
     sugar_g: float | None = Field(default=None, ge=0, le=5000)
+    fibre_g: float | None = Field(default=None, ge=0, le=5000)
+    sodium_mg: float | None = Field(default=None, ge=0, le=100000)
+    calcium_mg: float | None = Field(default=None, ge=0, le=100000)
+    iron_mg: float | None = Field(default=None, ge=0, le=10000)
+    potassium_mg: float | None = Field(default=None, ge=0, le=100000)
+    cholesterol_mg: float | None = Field(default=None, ge=0, le=100000)
+    alcohol_g: float | None = Field(default=None, ge=0, le=5000)
+    caffeine_mg: float | None = Field(default=None, ge=0, le=100000)
+    data_quality: str | None = Field(default=None, min_length=1, max_length=40)
     favourite: bool | None = None
     notes: str | None = Field(default=None, max_length=1000)
 
@@ -162,6 +186,46 @@ class FoodOutput(FoodBase):
     archived: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FoodComponentCreate(BaseModel):
+    food_id: str
+    quantity: float = Field(gt=0, le=100000)
+    unit: str = Field(default="serving", min_length=1, max_length=40)
+
+
+class CompositeFoodCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    serving_name: str = Field(default="1 serving", min_length=1, max_length=100)
+    serving_unit: str = Field(default="serving", min_length=1, max_length=40)
+    components: list[FoodComponentCreate] = Field(min_length=1)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class FoodPreferenceUpdate(BaseModel):
+    favourite: bool | None = None
+    default_quantity: float | None = Field(default=None, gt=0, le=100000)
+
+
+class ImportPreviewRequest(BaseModel):
+    tsv: str = Field(min_length=1, max_length=2_000_000)
+    mappings: dict[str, str] | None = None
+
+
+class ImportCommitRequest(BaseModel):
+    rows: list[dict[str, object]]
+    duplicate_action: str = Field(default="skip", pattern="^(skip|update|new)$")
+
+
+class ImportPreviewOutput(BaseModel):
+    headers: list[str]
+    mappings: dict[str, str | None]
+    total_rows: int
+    valid_rows: int
+    warning_rows: int
+    invalid_rows: int
+    duplicate_rows: int
+    rows: list[dict[str, object]]
 
 
 class DiaryEntryCreate(BaseModel):
@@ -194,6 +258,15 @@ class DiaryEntryOutput(BaseModel):
     carbohydrates_g: float | None
     fat_g: float | None
     sugar_g: float | None
+    saturated_fat_g: float | None
+    fibre_g: float | None
+    sodium_mg: float | None
+    calcium_mg: float | None
+    iron_mg: float | None
+    potassium_mg: float | None
+    cholesterol_mg: float | None
+    alcohol_g: float | None
+    caffeine_mg: float | None
     source: str
     created_at: datetime
     updated_at: datetime

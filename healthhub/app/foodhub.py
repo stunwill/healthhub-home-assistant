@@ -29,7 +29,7 @@ class FoodHubClient:
 
     async def status(self) -> FoodHubStatus:
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
                 response = await client.get(f"{self.base_url}/api/v1/capabilities")
                 response.raise_for_status()
                 payload = response.json()
@@ -47,7 +47,7 @@ class FoodHubClient:
 
     async def search_recipes(self, query: str, limit: int = 8) -> list[FoodHubRecipeResult]:
         try:
-            async with httpx.AsyncClient(timeout=self.timeout) as client:
+            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
                 response = await client.get(
                     f"{self.base_url}/api/v1/recipes/search",
                     params={"q": query, "limit": limit},
