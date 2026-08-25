@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from .database import get_db
 from .foodhub import FoodHubClient
-from .main import get_food_or_404, get_profile_or_404, load_options, scale_optional
+from .main import get_profile_or_404, load_options, scale_optional
 from .models import DiaryEntry, Food, FoodHubRecipeLink, FoodIdentifier, FoodPreference, MealPeriod, utc_now
 from .planning import create_planned_entry
 from .planning_schemas import PlannedEntryCreate, PlannedEntryOutput
