@@ -20,7 +20,7 @@ def test_migrations_create_current_schema(tmp_path: Path, monkeypatch) -> None: 
     engine = create_engine(f"sqlite:///{database}")
     inspector = inspect(engine)
     tables = inspector.get_table_names()
-    for table in ("profiles", "foods", "diary_entries", "exercise_entries", "weight_entries", "water_entries", "planned_entries", "recurrence_rules", "food_components", "food_preferences", "import_batches", "food_identifiers", "foodhub_recipe_links", "foodhub_ingredient_mappings"):
+    for table in ("profiles", "foods", "diary_entries", "exercise_entries", "weight_entries", "water_entries", "planned_entries", "recurrence_rules", "food_components", "food_preferences", "import_batches", "food_identifiers", "foodhub_recipe_links", "foodhub_ingredient_mappings", "saved_meals", "saved_meal_items"):
         assert table in tables
 
     profile_columns = {column["name"] for column in inspector.get_columns("profiles")}
@@ -51,3 +51,4 @@ def test_upgrade_from_v06_preserves_food_and_diary_data(tmp_path: Path, monkeypa
         assert connection.execute(text("SELECT name FROM foods WHERE id='migration-food'")).scalar_one() == "Existing food"
         assert connection.execute(text("SELECT calories FROM diary_entries WHERE id='migration-entry'")).scalar_one() == 298.4
         assert connection.execute(text("SELECT nutrition_basis FROM foods WHERE id='migration-food'")).scalar_one() == "per_serving"
+        assert connection.execute(text("SELECT COUNT(*) FROM saved_meals")).scalar_one() == 0

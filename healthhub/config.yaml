@@ -1,5 +1,5 @@
 name: HealthHub
-version: "0.7.0"
+version: "0.8.0"
 slug: healthhub
 description: Personal nutrition, activity, goals and progress tracking for Home Assistant with FoodHub integration.
 url: https://github.com/stunwill/healthhub-home-assistant
