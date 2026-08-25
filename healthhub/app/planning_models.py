@@ -4,8 +4,8 @@ from datetime import date, datetime
 from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Index, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 from .models import MealPeriod, utc_now
@@ -67,3 +67,30 @@ class PlannedEntry(Base):
         Index("ix_planned_profile_date", "profile_id", "planned_for"),
         Index("ix_planned_profile_status", "profile_id", "status"),
     )
+
+
+class SavedMeal(Base):
+    __tablename__ = "saved_meals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    profile_id: Mapped[str] = mapped_column(ForeignKey("profiles.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(120), index=True)
+    default_meal_period: Mapped[str] = mapped_column(String(20), default=MealPeriod.LUNCH.value)
+    archived: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+
+    items: Mapped[list[SavedMealItem]] = relationship(back_populates="meal", cascade="all, delete-orphan", lazy="selectin")
+
+
+class SavedMealItem(Base):
+    __tablename__ = "saved_meal_items"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
+    saved_meal_id: Mapped[str] = mapped_column(ForeignKey("saved_meals.id", ondelete="CASCADE"), index=True)
+    food_id: Mapped[str] = mapped_column(ForeignKey("foods.id", ondelete="RESTRICT"), index=True)
+    servings: Mapped[float] = mapped_column(Float, default=1.0)
+    position: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+    meal: Mapped[SavedMeal] = relationship(back_populates="items")

@@ -44,18 +44,21 @@ class FoodHubRecipeResult:
 
 
 class FoodHubClient:
-    def __init__(self, base_url: str, timeout_seconds: float = 2.0) -> None:
+    def __init__(self, base_url: str, timeout_seconds: float = 1.5) -> None:
         self.base_url = base_url.rstrip("/")
-        self.timeout = httpx.Timeout(timeout_seconds)
+        timeout = httpx.Timeout(timeout_seconds, connect=min(timeout_seconds, 0.75))
+        self._client = httpx.AsyncClient(timeout=timeout, trust_env=False, limits=httpx.Limits(max_connections=10, max_keepalive_connections=5))
+
+    async def close(self) -> None:
+        await self._client.aclose()
 
     async def _json(self, path: str, params: dict | None = None) -> object | None:
         try:
-            async with httpx.AsyncClient(timeout=self.timeout, trust_env=False) as client:
-                response = await client.get(f"{self.base_url}{path}", params=params)
-                if response.status_code in {404, 405}:
-                    return None
-                response.raise_for_status()
-                return response.json()
+            response = await self._client.get(f"{self.base_url}{path}", params=params)
+            if response.status_code in {404, 405}:
+                return None
+            response.raise_for_status()
+            return response.json()
         except (httpx.HTTPError, ValueError):
             return None
 

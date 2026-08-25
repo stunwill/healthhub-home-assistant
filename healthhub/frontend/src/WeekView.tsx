@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type MealPeriod = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'drink'
 type PlannedStatus = 'planned' | 'consumed' | 'skipped'
@@ -71,6 +71,9 @@ export default function WeekView({ profileId, onNotice }: Props) {
   const [mealPeriod, setMealPeriod] = useState<MealPeriod>('lunch')
   const [servings, setServings] = useState('1')
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekdays' | 'weekly'>('none')
+  const [savingPlan, setSavingPlan] = useState(false)
+  const [searchingFoodHub, setSearchingFoodHub] = useState(false)
+  const searchAbort = useRef<AbortController | null>(null)
 
   async function loadWeek() {
     const [summaryResponse, plannedResponse] = await Promise.all([
@@ -89,15 +92,38 @@ export default function WeekView({ profileId, onNotice }: Props) {
 
   useEffect(() => {
     if (search.trim().length < 2) {
+      searchAbort.current?.abort()
       setResults([])
+      setSearchingFoodHub(false)
       return
     }
     const timer = window.setTimeout(async () => {
-      const response = await fetch(`${API}/quick-add/search?q=${encodeURIComponent(search.trim())}`)
-      if (response.ok) setResults((await response.json()) as SearchResult[])
+      searchAbort.current?.abort()
+      const controller = new AbortController()
+      searchAbort.current = controller
+      const query = encodeURIComponent(search.trim())
+      try {
+        const localResponse = await fetch(`${API}/quick-add/search?q=${query}&profile_id=${profileId}&include_foodhub=false`, { signal: controller.signal })
+        if (!localResponse.ok) return
+        const localResults = (await localResponse.json()) as SearchResult[]
+        setResults(localResults)
+        setSearchingFoodHub(true)
+        const foodHubResponse = await fetch(`${API}/quick-add/search?q=${query}&profile_id=${profileId}&local=false`, { signal: controller.signal })
+        if (foodHubResponse.ok) {
+          const foodHubResults = (await foodHubResponse.json()) as SearchResult[]
+          setResults((current) => {
+            const keys = new Set(current.map((item) => `${item.source}:${item.id}`))
+            return [...current, ...foodHubResults.filter((item) => !keys.has(`${item.source}:${item.id}`))].slice(0, 12)
+          })
+        }
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'AbortError')) onNotice('Food search is temporarily unavailable')
+      } finally {
+        if (searchAbort.current === controller) setSearchingFoodHub(false)
+      }
     }, 250)
     return () => window.clearTimeout(timer)
-  }, [search])
+  }, [search, profileId])
 
   const grouped = useMemo(() => {
     const groups = new Map<string, PlannedEntry[]>()
@@ -116,7 +142,21 @@ export default function WeekView({ profileId, onNotice }: Props) {
     setWeekStart(localDate(next))
   }
 
+  function addEntryToSummary(entry: PlannedEntry) {
+    const day = localDate(new Date(entry.planned_for))
+    setSummary((current) => {
+      if (!current) return current
+      const kcal = Math.round(entry.calories)
+      return {
+        ...current,
+        planned_calories: current.planned_calories + kcal,
+        days: current.days.map((item) => item.date === day ? { ...item, planned_calories: item.planned_calories + kcal, planned_count: item.planned_count + 1 } : item),
+      }
+    })
+  }
+
   async function savePlan() {
+    if (savingPlan) return
     if (!selectedFood || selectedFood.source !== 'healthhub') {
       onNotice('Choose a HealthHub food with nutrition before planning it')
       return
@@ -127,25 +167,33 @@ export default function WeekView({ profileId, onNotice }: Props) {
       onNotice('Servings must be greater than zero')
       return
     }
-    const endpoint = recurrence === 'none'
-      ? `${API}/profiles/${profileId}/planned`
-      : `${API}/profiles/${profileId}/recurrence`
+    setSavingPlan(true)
+    const endpoint = recurrence === 'none' ? `${API}/profiles/${profileId}/planned` : `${API}/profiles/${profileId}/recurrence`
     const body = recurrence === 'none'
       ? { food_id: selectedFood.id, meal_period: mealPeriod, planned_for: plannedFor, servings: numericServings }
       : { food_id: selectedFood.id, frequency: recurrence, meal_period: mealPeriod, servings: numericServings, start_date: planDate, local_time: planTime }
-    const response = await fetch(endpoint, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    })
-    if (!response.ok) {
-      onNotice('Could not save the planned item')
-      return
+    try {
+      const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!response.ok) {
+        onNotice('Could not save the planned item')
+        return
+      }
+      if (recurrence === 'none') {
+        const entry = (await response.json()) as PlannedEntry
+        setPlanned((current) => [...current, entry].sort((a, b) => a.planned_for.localeCompare(b.planned_for)))
+        addEntryToSummary(entry)
+      } else {
+        await response.json()
+        void loadWeek()
+      }
+      setSelectedFood(null)
+      setSearch('')
+      setResults([])
+      setRecurrence('none')
+      onNotice(recurrence === 'none' ? 'Food planned' : 'Recurring food plan created')
+    } finally {
+      setSavingPlan(false)
     }
-    setSelectedFood(null)
-    setSearch('')
-    setResults([])
-    setRecurrence('none')
-    onNotice(recurrence === 'none' ? 'Food planned' : 'Recurring food plan created')
-    await loadWeek()
   }
 
   async function updateStatus(entry: PlannedEntry, action: 'consume' | 'skip') {
@@ -154,8 +202,10 @@ export default function WeekView({ profileId, onNotice }: Props) {
       onNotice(`Could not ${action} this planned item`)
       return
     }
+    const updated = (await response.json()) as PlannedEntry
+    setPlanned((current) => current.map((item) => item.id === updated.id ? updated : item))
     onNotice(action === 'consume' ? 'Planned item marked as consumed' : 'Planned item skipped')
-    await loadWeek()
+    void loadWeek()
   }
 
   return <section>
@@ -175,7 +225,7 @@ export default function WeekView({ profileId, onNotice }: Props) {
         {(grouped.get(day.date) ?? []).length === 0 ? <p className="muted">Nothing planned</p> : (grouped.get(day.date) ?? []).map((entry) =>
           <div className={`planned-row status-${entry.status}`} key={entry.id}>
             <div><span className="meal-tag">{entry.meal_period}</span><strong>{entry.food_name}</strong><small>{entry.servings} × {entry.serving_name} · {Math.round(entry.calories)} kcal</small></div>
-            {entry.status === 'planned' ? <div className="planned-actions"><button onClick={() => void updateStatus(entry, 'consume')}>Consumed</button><button onClick={() => void updateStatus(entry, 'skip')}>Skip</button></div> : <span className="status-label">{entry.status}</span>}
+            {entry.status === 'planned' ? <div className="planned-actions"><button onClick={() => void updateStatus(entry, 'consume')}>Eaten</button><button onClick={() => void updateStatus(entry, 'skip')}>Skip</button></div> : <span className="status-label">{entry.status}</span>}
           </div>)}
       </article>)}
     </div>
@@ -184,15 +234,16 @@ export default function WeekView({ profileId, onNotice }: Props) {
       <h2>Add to plan</h2>
       <input aria-label="Search food to plan" placeholder="Search HealthHub foods" value={search} onChange={(event) => { setSearch(event.target.value); setSelectedFood(null) }} />
       {results.length > 0 && <div className="search-results">{results.map((result) => <button key={`${result.source}-${result.id}`} className="search-result" onClick={() => { setSelectedFood(result); setSearch(result.name); setResults([]) }}><span><strong>{result.name}</strong><small>{result.subtitle ?? result.source}</small></span><b>{result.calories == null ? 'Nutrition pending' : `${Math.round(result.calories)} kcal`}</b></button>)}</div>}
+      {searchingFoodHub && <p className="muted">Checking FoodHub recipes…</p>}
       <div className="planner-fields">
-        <label>Date<input type="date" value={planDate} onChange={(event) => setPlanDate(event.target.value)} /></label>
-        <label>Time<input type="time" value={planTime} onChange={(event) => setPlanTime(event.target.value)} /></label>
-        <label>Meal<select value={mealPeriod} onChange={(event) => setMealPeriod(event.target.value as MealPeriod)}><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option><option value="drink">Drink</option></select></label>
-        <label>Servings<input inputMode="decimal" value={servings} onChange={(event) => setServings(event.target.value)} /></label>
-        <label>Repeat<select value={recurrence} onChange={(event) => setRecurrence(event.target.value as typeof recurrence)}><option value="none">Once</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option></select></label>
+        <label>Date<input type="date" value={planDate} disabled={savingPlan} onChange={(event) => setPlanDate(event.target.value)} /></label>
+        <label>Time<input type="time" value={planTime} disabled={savingPlan} onChange={(event) => setPlanTime(event.target.value)} /></label>
+        <label>Meal<select value={mealPeriod} disabled={savingPlan} onChange={(event) => setMealPeriod(event.target.value as MealPeriod)}><option value="breakfast">Breakfast</option><option value="lunch">Lunch</option><option value="dinner">Dinner</option><option value="snack">Snack</option><option value="drink">Drink</option></select></label>
+        <label>Servings<input inputMode="decimal" value={servings} disabled={savingPlan} onChange={(event) => setServings(event.target.value)} /></label>
+        <label>Repeat<select value={recurrence} disabled={savingPlan} onChange={(event) => setRecurrence(event.target.value as typeof recurrence)}><option value="none">Once</option><option value="daily">Daily</option><option value="weekdays">Weekdays</option><option value="weekly">Weekly</option></select></label>
       </div>
-      <button className="quick-add" disabled={!selectedFood} onClick={() => void savePlan()}>Add to plan</button>
-      {selectedFood?.source === 'foodhub' && <p className="muted">FoodHub recipes cannot be planned as consumed nutrition until authoritative per-serving nutrition is available.</p>}
+      <button className="quick-add" disabled={!selectedFood || savingPlan} onClick={() => void savePlan()}>{savingPlan ? 'Adding…' : 'Add to plan'}</button>
+      {selectedFood?.source === 'foodhub' && <p className="muted">Add the FoodHub recipe to your diary first to create an authoritative HealthHub nutrition snapshot.</p>}
     </section>
   </section>
 }
