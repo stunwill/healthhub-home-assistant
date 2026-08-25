@@ -21,6 +21,7 @@ from .planning_models import (
     SavedMealItem,
 )
 from .planning_schemas import (
+    ConsumedEntrySummary,
     CopyDayRequest,
     CopyEntryRequest,
     CopyMealRequest,
@@ -562,7 +563,7 @@ def weekly_plan(
     first, _ = day_bounds(week_start, profile.timezone)
     _, last = day_bounds(week_end, profile.timezone)
 
-    planned = list(
+    planned_entries: list[PlannedEntry] = list(
         db.scalars(
             select(PlannedEntry).where(
                 PlannedEntry.profile_id == profile_id,
@@ -571,7 +572,7 @@ def weekly_plan(
             )
         ).all()
     )
-    consumed = list(
+    consumed_entries: list[DiaryEntry] = list(
         db.scalars(
             select(DiaryEntry).where(
                 DiaryEntry.profile_id == profile_id,
@@ -583,12 +584,12 @@ def weekly_plan(
     zone = ZoneInfo(profile.timezone)
     planned_by_day: dict[date, list[PlannedEntry]] = {}
     consumed_by_day: dict[date, list[DiaryEntry]] = {}
-    for item in planned:
-        local_day = aware_utc(item.planned_for).astimezone(zone).date()
-        planned_by_day.setdefault(local_day, []).append(item)
-    for item in consumed:
-        local_day = aware_utc(item.consumed_at).astimezone(zone).date()
-        consumed_by_day.setdefault(local_day, []).append(item)
+    for planned_entry in planned_entries:
+        local_day = aware_utc(planned_entry.planned_for).astimezone(zone).date()
+        planned_by_day.setdefault(local_day, []).append(planned_entry)
+    for consumed_entry in consumed_entries:
+        local_day = aware_utc(consumed_entry.consumed_at).astimezone(zone).date()
+        consumed_by_day.setdefault(local_day, []).append(consumed_entry)
 
     days: list[WeeklyPlanDay] = []
     for offset in range(7):
@@ -633,7 +634,7 @@ def day_plan(
     profile = get_profile(db, profile_id)
     target = day or profile_today(profile)
     first, last = day_bounds(target, profile.timezone)
-    planned = list(
+    planned_entries: list[PlannedEntry] = list(
         db.scalars(
             select(PlannedEntry)
             .where(
@@ -644,7 +645,7 @@ def day_plan(
             .order_by(PlannedEntry.planned_for)
         ).all()
     )
-    consumed = list(
+    consumed_entries: list[DiaryEntry] = list(
         db.scalars(
             select(DiaryEntry)
             .where(
@@ -654,9 +655,28 @@ def day_plan(
             .order_by(DiaryEntry.consumed_at)
         ).all()
     )
-    planned_calories = round(sum(item.calories for item in planned))
-    consumed_calories = round(sum(item.calories for item in consumed))
-    combined = [*planned, *consumed]
+    planned_calories = round(sum(item.calories for item in planned_entries))
+    consumed_calories = round(sum(item.calories for item in consumed_entries))
+    protein_g = round(
+        sum(item.protein_g or 0 for item in planned_entries)
+        + sum(item.protein_g or 0 for item in consumed_entries),
+        1,
+    )
+    carbohydrates_g = round(
+        sum(item.carbohydrates_g or 0 for item in planned_entries)
+        + sum(item.carbohydrates_g or 0 for item in consumed_entries),
+        1,
+    )
+    fat_g = round(
+        sum(item.fat_g or 0 for item in planned_entries)
+        + sum(item.fat_g or 0 for item in consumed_entries),
+        1,
+    )
+    sugar_g = round(
+        sum(item.sugar_g or 0 for item in planned_entries)
+        + sum(item.sugar_g or 0 for item in consumed_entries),
+        1,
+    )
     return DailyPlanOutput(
         profile_id=profile_id,
         date=target,
@@ -668,15 +688,16 @@ def day_plan(
             - consumed_calories
             - planned_calories
         ),
-        protein_g=round(sum(item.protein_g or 0 for item in combined), 1),
-        carbohydrates_g=round(
-            sum(item.carbohydrates_g or 0 for item in combined),
-            1,
-        ),
-        fat_g=round(sum(item.fat_g or 0 for item in combined), 1),
-        sugar_g=round(sum(item.sugar_g or 0 for item in combined), 1),
-        planned=planned,
-        consumed=consumed,
+        protein_g=protein_g,
+        carbohydrates_g=carbohydrates_g,
+        fat_g=fat_g,
+        sugar_g=sugar_g,
+        planned=[
+            PlannedEntryOutput.model_validate(item) for item in planned_entries
+        ],
+        consumed=[
+            ConsumedEntrySummary.model_validate(item) for item in consumed_entries
+        ],
     )
 
 
@@ -696,38 +717,38 @@ def copy_entry(
         payload.local_time,
         tzinfo=ZoneInfo(profile.timezone),
     )
-    planned = db.scalar(
+    planned_entry = db.scalar(
         select(PlannedEntry).where(
             PlannedEntry.id == payload.entry_id,
             PlannedEntry.profile_id == profile_id,
         )
     )
-    if planned:
-        copy = copy_planned_snapshot(
-            planned,
+    if planned_entry:
+        copied_entry = copy_planned_snapshot(
+            planned_entry,
             profile_id,
             target_local,
             payload.meal_period.value if payload.meal_period else None,
         )
     else:
-        diary = db.scalar(
+        consumed_entry = db.scalar(
             select(DiaryEntry).where(
                 DiaryEntry.id == payload.entry_id,
                 DiaryEntry.profile_id == profile_id,
             )
         )
-        if not diary:
+        if not consumed_entry:
             raise HTTPException(status_code=404, detail="Entry not found")
-        copy = copy_diary_snapshot(
-            diary,
+        copied_entry = copy_diary_snapshot(
+            consumed_entry,
             profile_id,
             target_local,
             payload.meal_period.value if payload.meal_period else None,
         )
-    db.add(copy)
+    db.add(copied_entry)
     db.commit()
-    db.refresh(copy)
-    return copy
+    db.refresh(copied_entry)
+    return copied_entry
 
 
 @router.post(
@@ -743,7 +764,7 @@ def copy_meal(
     profile = get_profile(db, profile_id)
     first, last = day_bounds(payload.source_date, profile.timezone)
     zone = ZoneInfo(profile.timezone)
-    planned = list(
+    planned_entries: list[PlannedEntry] = list(
         db.scalars(
             select(PlannedEntry).where(
                 PlannedEntry.profile_id == profile_id,
@@ -753,7 +774,7 @@ def copy_meal(
             )
         ).all()
     )
-    consumed = list(
+    consumed_entries: list[DiaryEntry] = list(
         db.scalars(
             select(DiaryEntry).where(
                 DiaryEntry.profile_id == profile_id,
@@ -764,11 +785,11 @@ def copy_meal(
     )
 
     copies: list[PlannedEntry] = []
-    for item in planned:
-        local = aware_utc(item.planned_for).astimezone(zone)
+    for planned_entry in planned_entries:
+        local = aware_utc(planned_entry.planned_for).astimezone(zone)
         copies.append(
             copy_planned_snapshot(
-                item,
+                planned_entry,
                 profile_id,
                 datetime.combine(
                     payload.target_date,
@@ -777,11 +798,11 @@ def copy_meal(
                 ),
             )
         )
-    for item in consumed:
-        local = aware_utc(item.consumed_at).astimezone(zone)
+    for consumed_entry in consumed_entries:
+        local = aware_utc(consumed_entry.consumed_at).astimezone(zone)
         copies.append(
             copy_diary_snapshot(
-                item,
+                consumed_entry,
                 profile_id,
                 datetime.combine(
                     payload.target_date,
@@ -793,8 +814,8 @@ def copy_meal(
 
     db.add_all(copies)
     db.commit()
-    for item in copies:
-        db.refresh(item)
+    for copied_entry in copies:
+        db.refresh(copied_entry)
     return copies
 
 
@@ -811,7 +832,7 @@ def copy_day(
     profile = get_profile(db, profile_id)
     first, last = day_bounds(payload.source_date, profile.timezone)
     zone = ZoneInfo(profile.timezone)
-    planned = list(
+    planned_entries: list[PlannedEntry] = list(
         db.scalars(
             select(PlannedEntry).where(
                 PlannedEntry.profile_id == profile_id,
@@ -820,7 +841,7 @@ def copy_day(
             )
         ).all()
     )
-    consumed = list(
+    consumed_entries: list[DiaryEntry] = list(
         db.scalars(
             select(DiaryEntry).where(
                 DiaryEntry.profile_id == profile_id,
@@ -830,11 +851,11 @@ def copy_day(
     )
 
     copies: list[PlannedEntry] = []
-    for item in planned:
-        local = aware_utc(item.planned_for).astimezone(zone)
+    for planned_entry in planned_entries:
+        local = aware_utc(planned_entry.planned_for).astimezone(zone)
         copies.append(
             copy_planned_snapshot(
-                item,
+                planned_entry,
                 profile_id,
                 datetime.combine(
                     payload.target_date,
@@ -843,11 +864,11 @@ def copy_day(
                 ),
             )
         )
-    for item in consumed:
-        local = aware_utc(item.consumed_at).astimezone(zone)
+    for consumed_entry in consumed_entries:
+        local = aware_utc(consumed_entry.consumed_at).astimezone(zone)
         copies.append(
             copy_diary_snapshot(
-                item,
+                consumed_entry,
                 profile_id,
                 datetime.combine(
                     payload.target_date,
@@ -859,8 +880,8 @@ def copy_day(
 
     db.add_all(copies)
     db.commit()
-    for item in copies:
-        db.refresh(item)
+    for copied_entry in copies:
+        db.refresh(copied_entry)
     return copies
 
 
