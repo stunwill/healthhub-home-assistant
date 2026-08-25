@@ -12,30 +12,39 @@ button:disabled, input:disabled, select:disabled { cursor: not-allowed; opacity:
 .profile-select select, .meal-period select { min-height: 44px; border: 1px solid #c8d8d0; border-radius: 12px; background: white; padding: 0 12px; color: #17352c; }
 .content { max-width: 1100px; margin: 0 auto; padding: 24px 18px; }
 .page-heading, .section-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 20px; }
-.section-heading { margin-top: 24px; margin-bottom: 10px; align-items: center; }
+.section-heading { margin-top: 0; margin-bottom: 10px; align-items: center; }
 .section-heading h2 { margin: 0; }
 .section-heading span { color: #687a73; font-size: .85rem; }
+.section-heading button { min-height: 34px; background: #eef4f1; color: #15553f; padding: 0 10px; }
 .eyebrow { margin: 0 0 4px; text-transform: uppercase; letter-spacing: .08em; color: #6a7f76; font-size: .75rem; font-weight: 700; }
 h1, h2, p { margin-top: 0; }
 .quick-add { background: #1e6d52; color: white; font-weight: 700; }
 .target-grid, .progress-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
-.target-card, .empty-card, .diary-row, .profile-onboarding, .planner-card { background: white; border: 1px solid #dbe7e1; border-radius: 18px; padding: 18px; box-shadow: 0 8px 24px rgba(26,64,51,.05); }
+.target-card, .empty-card, .diary-row, .profile-onboarding, .planner-card, .meal-section { background: white; border: 1px solid #dbe7e1; border-radius: 18px; padding: 18px; box-shadow: 0 8px 24px rgba(26,64,51,.05); }
 .target-card span { display: block; color: #687a73; font-size: .8rem; margin-bottom: 8px; }
 .target-card strong { font-size: 1.15rem; text-transform: capitalize; }
 .target-card small, .muted { color: #687a73; }
 .nutrition-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin-top: 12px; }
 .nutrition-strip article { background: #eaf3ef; border-radius: 14px; padding: 12px; }
 .nutrition-strip span { display: block; color: #687a73; font-size: .75rem; margin-bottom: 4px; }
+.meal-sections { display: grid; gap: 12px; margin-top: 18px; }
+.meal-section { padding: 14px; }
+.compact-empty { margin: 0; padding: 2px 0; }
 .diary-list { margin-top: 18px; }
-.diary-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+.diary-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; padding: 14px; box-shadow: none; }
+.diary-row:last-child { margin-bottom: 0; }
 .diary-row > div:first-child { display: grid; gap: 4px; }
 .diary-row small, .search-result small { color: #687a73; }
+.planned-entry { border-style: dashed; background: #fbfcfb; }
 .meal-tag { width: max-content; padding: 3px 8px; border-radius: 999px; background: #e6f1ec; font-size: .72rem; font-weight: 700; text-transform: capitalize; }
+.eaten-tag { background: #dff2e9; }
 .diary-energy { display: grid; gap: 6px; justify-items: end; }
 .diary-energy button { min-height: 32px; padding: 0 8px; background: transparent; color: #8a4138; font-size: .78rem; }
+.row-actions { display: flex; gap: 4px; }
+.row-actions button:first-child { color: #15553f; }
 .notice { margin-bottom: 16px; background: #e5f2ec; border-radius: 12px; padding: 12px 14px; }
-.bottom-nav { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid #d9e5df; background: white; padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)); }
-.bottom-nav button { background: transparent; color: #61766d; border-radius: 10px; }
+.bottom-nav { position: fixed; z-index: 8; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #d9e5df; background: white; padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)); }
+.bottom-nav button { background: transparent; color: #61766d; border-radius: 10px; padding: 0 6px; }
 .bottom-nav button[aria-current="page"] { background: #e6f1ec; color: #15553f; font-weight: 700; }
 .state-page { min-height: 100vh; display: grid; place-content: center; padding: 24px; text-align: center; }
 .sheet-backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0,0,0,.35); display: flex; align-items: end; }
@@ -43,6 +52,9 @@ h1, h2, p { margin-top: 0; }
 .sheet-handle { width: 48px; height: 5px; margin: 0 auto 16px; background: #ccd8d2; border-radius: 999px; }
 .quick-sheet input, .food-form input, .food-form select, .planner-card input, .planner-card select { width: 100%; min-height: 48px; border: 1px solid #c8d8d0; border-radius: 14px; padding: 0 14px; background: white; color: #17352c; }
 .meal-period { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; margin-bottom: 12px; }
+.quick-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+.quick-mode button { background: #eef4f1; color: #31564a; }
+.quick-mode button.active { background: #1e6d52; color: white; font-weight: 700; }
 .search-results { display: grid; gap: 8px; margin-bottom: 12px; }
 .search-result { min-height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f6faf8; border: 1px solid #dce8e2; text-align: left; color: #17352c; }
 .search-result span { display: grid; gap: 3px; }
@@ -58,8 +70,7 @@ h1, h2, p { margin-top: 0; }
 .multi-select summary { list-style: none; min-height: 48px; display: flex; align-items: center; border: 1px solid #c8d8d0; border-radius: 14px; padding: 0 14px; background: white; color: #17352c; cursor: pointer; font-weight: 500; }
 .multi-select summary::-webkit-details-marker { display: none; }
 .multi-select-menu { position: absolute; z-index: 12; left: 0; right: 0; top: calc(100% + 4px); display: grid; gap: 4px; padding: 8px; border: 1px solid #c8d8d0; border-radius: 14px; background: white; box-shadow: 0 12px 28px rgba(26,64,51,.14); }
-.multi-select-menu label { display: flex !important; grid-template-columns: none; align-items: center; gap: 10px; min-height: 42px; padding: 6px 8px; border-radius: 10px; }
-.multi-select-menu label:hover { background: #eef5f1; }
+.multi-select-menu label { display: flex !important; align-items: center; gap: 10px; min-height: 42px; padding: 6px 8px; border-radius: 10px; }
 .multi-select-menu input { width: 20px !important; min-height: 20px !important; }
 .progress-forms { display: grid; gap: 12px; margin-top: 18px; }
 .planner-card { display: grid; gap: 12px; }
@@ -67,12 +78,8 @@ h1, h2, p { margin-top: 0; }
 .inline-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .water-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .water-presets button { background: #e6f1ec; color: #15553f; font-weight: 700; padding: 0 8px; }
-.progress-track { height: 8px; overflow: hidden; border-radius: 999px; background: #e1ebe6; margin: 10px 0; }
-.progress-track span { height: 100%; margin: 0; background: #1e6d52; border-radius: inherit; }
-.weight-history { margin-top: 24px; }
-.history-row { display: flex; justify-content: space-between; padding: 12px 4px; border-bottom: 1px solid #dbe7e1; }
-.weight-chart { height: 180px; display: flex; align-items: end; gap: 6px; padding: 16px 12px 8px; background: white; border: 1px solid #dbe7e1; border-radius: 18px; overflow-x: auto; }
-.weight-bar-wrap { height: 100%; min-width: 28px; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: end; gap: 5px; }
-.weight-bar { width: min(24px, 80%); min-height: 8px; background: #1e6d52; border-radius: 7px 7px 2px 2px; }
-.weight-bar-wrap small { font-size: .65rem; color: #687a73; }
-@media (min-width: 760px) { .content { padding: 32px; } .target-grid, .progress-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } .quick-sheet { width: min(620px, calc(100% - 48px)); margin: auto; border-radius: 24px; } .sheet-backdrop { align-items: center; } .food-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .progress-forms { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.date-nav { display: grid; grid-template-columns: auto minmax(145px, 1fr) auto auto; gap: 8px; margin-bottom: 14px; }
+.date-nav button { background: white; border: 1px solid #dbe7e1; color: #31564a; }
+.date-nav input { min-height: 44px; border: 1px solid #dbe7e1; border-radius: 12px; padding: 0 10px; background: white; }
+@media (min-width: 760px) { .content { padding: 32px; } .target-grid, .progress-grid { grid-template-columns: repeat(4, minmax(0,1fr)); } .quick-sheet { width: min(620px, calc(100% - 48px)); margin: auto; border-radius: 24px; } .sheet-backdrop { align-items: center; } .food-form { grid-template-columns: repeat(2, minmax(0, 1fr)); } .progress-forms { grid-template-columns: repeat(3, minmax(0, 1fr)); } .meal-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .content { padding: 16px 12px; } .diary-heading { align-items: center; margin-bottom: 12px; } .diary-heading h1 { font-size: 1.35rem; margin-bottom: 0; } .date-nav { grid-template-columns: 1fr 1fr; } .date-nav input { grid-column: 1 / -1; grid-row: 1; } .target-card { padding: 14px; } .meal-section { padding: 12px; } .diary-row { align-items: flex-start; } .diary-energy { justify-items: start; } .diary-row { flex-direction: column; } .row-actions { width: 100%; } }
