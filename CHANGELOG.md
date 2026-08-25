@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.8.0 - Daily Diary, Meal Planning & Planner Responsiveness
+
+### Added
+
+- Added a selected-date Daily Diary with Breakfast, Morning Snack, Lunch, Afternoon Snack, Dinner, Evening Snack and Drinks sections.
+- Added explicit Daily Goal, Eaten, Planned and Remaining-after-planned calorie totals plus protein, carbohydrate, fat and sugar totals.
+- Added planned-entry editing, Mark eaten, individual copy, meal copy and whole-day copy workflows. Copied historical food is created as Planned and retains its nutrition snapshot.
+- Added profile-scoped reusable saved meals and saved meal items with independent planned-entry snapshots.
+- Added local-first Quick Add suggestions ranked by profile favourites, use frequency and recency.
+- Added independent FoodHub recipe search and authoritative FoodHub recipe planning.
+- Added lightweight performance logging for local predictive search and FoodHub search.
+
+### Planner responsiveness
+
+- Add to Plan now enters an immediate `Adding…` state, disables duplicate submission and restores the controls after success or failure.
+- One-off planned foods use the POST response to update the visible week immediately instead of blocking on a full week reload.
+- Weekly summary data is loaded using one planned-entry range query and one consumed-entry range query instead of querying each of seven days separately.
+- Recurrence materialisation loads all existing occurrences for the horizon in one query and performs in-memory duplicate checking rather than an existence query for every candidate date.
+- Predictive search cancels stale requests. Local HealthHub results are displayed before the separately requested FoodHub results.
+- Repeated FoodHub requests use a pooled HTTP client with keep-alive and application shutdown cleanup.
+
+### Changed
+
+- Expanded meal-period values to support separate morning, afternoon and evening snack sections while retaining the legacy `snack` value for existing records.
+- Planned serving changes rescale the stored nutrition snapshot rather than re-reading potentially changed Food Library nutrition.
+- Consumed diary entries can be edited for serving quantity and meal placement while preserving snapshot semantics.
+- FoodHub-linked recipes are suppressed from external search after a local linked representation exists, reducing duplicate results.
+
+### Migration and compatibility
+
+- Added Alembic migration `0008_saved_meals` for `saved_meals` and `saved_meal_items`.
+- Existing v0.7 Food Library records, barcode/product data, OCR metadata, FoodHub links, diary snapshots, planned entries, recurrence rules, exercise, weight and hydration data are preserved.
+- Home Assistant remains the trust boundary; no application authentication layer is added.
+
 ## 0.7.0 - Food Capture, Product Lookup & Recipe Nutrition
 
 ### Added
@@ -111,7 +145,7 @@
 - Added profile-scoped planned food entries with immutable nutrition snapshots, meal period, servings and timezone-aware planned times.
 - Added a functional Week view with previous/next week navigation, daily planned-versus-consumed calorie totals and planned item status.
 - Added actions to mark a planned item consumed, skip it, or remove an unconsumed plan.
-- Marking a planned item consumed creates a real diary entry using the planned nutrition snapshot, it does not silently alter the underlying food definition.
+- Marking an item consumed creates a real diary entry using the planned nutrition snapshot, it does not silently alter the underlying food definition.
 - Added simple recurrence rules for daily, weekdays and weekly patterns, materialised for an eight-week planning horizon.
 - Added weekly plan summary and recurrence management endpoints under `/api/v1`.
 - Added Alembic migration `0004_planning_recurrence` and backend tests covering plan, consume, skip, recurrence, weekly totals, validation and migrations.
