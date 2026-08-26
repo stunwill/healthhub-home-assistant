@@ -28,11 +28,11 @@ def png_bytes() -> bytes:
     return buffer.getvalue()
 
 
-def create_profile() -> str:
+def create_profile(name: str = "Image Capture User") -> str:
     response = client.post(
         "/api/v1/profiles",
         json={
-            "display_name": "Image Capture User",
+            "display_name": name,
             "daily_calorie_target": 1800,
             "weekly_exercise_minutes_target": 150,
             "exercise_credit_mode": "none",
@@ -46,11 +46,33 @@ def create_profile() -> str:
     return response.json()["id"]
 
 
+def capture_images(count: int = 1) -> dict:
+    with patch(
+        "app.v081_capture.pytesseract.image_to_string",
+        return_value="Energy 420 kJ\nProtein 10 g\n",
+    ), patch(
+        "app.v081_capture.pytesseract.image_to_data",
+        return_value={"conf": ["90"]},
+    ):
+        response = client.post(
+            "/api/v1/capture/nutrition-labels",
+            files=[
+                ("images", (f"label-{index}.png", png_bytes(), "image/png"))
+                for index in range(count)
+            ],
+        )
+    assert response.status_code == 202
+    return response.json()
+
+
 def test_multi_image_capture_merges_independent_ocr_results() -> None:
-    with patch("app.v081_capture.pytesseract.image_to_string", side_effect=[
-        "Serving size 40 g\nEnergy 620 kJ\nProtein 4 g\n",
-        "Carbohydrate 27 g\nSugars 8 g\nFat 2 g\n",
-    ]), patch(
+    with patch(
+        "app.v081_capture.pytesseract.image_to_string",
+        side_effect=[
+            "Serving size 40 g\nEnergy 620 kJ\nProtein 4 g\n",
+            "Carbohydrate 27 g\nSugars 8 g\nFat 2 g\n",
+        ],
+    ), patch(
         "app.v081_capture.pytesseract.image_to_data",
         return_value={"conf": ["90", "91", "92"]},
     ):
@@ -79,17 +101,17 @@ def test_multi_image_capture_rejects_invalid_image() -> None:
     assert response.status_code == 422
 
 
+def test_multi_image_capture_rejects_unsupported_type() -> None:
+    response = client.post(
+        "/api/v1/capture/nutrition-labels",
+        files=[("images", ("label.txt", b"plain text", "text/plain"))],
+    )
+    assert response.status_code == 415
+
+
 def test_review_and_add_preserves_selected_meal_context() -> None:
     profile_id = create_profile()
-    with patch("app.v081_capture.pytesseract.image_to_string", return_value="Energy 420 kJ\nProtein 10 g\n"), patch(
-        "app.v081_capture.pytesseract.image_to_data",
-        return_value={"conf": ["90"]},
-    ):
-        upload = client.post(
-            "/api/v1/capture/nutrition-labels",
-            files=[("images", ("label.png", png_bytes(), "image/png"))],
-        )
-    upload_id = upload.json()["images"][0]["upload_id"]
+    upload_id = capture_images()["images"][0]["upload_id"]
     response = client.post(
         f"/api/v1/capture/nutrition-label/review-and-add?profile_id={profile_id}&day=2026-08-26&meal_period=lunch&mode=eaten&servings=1",
         json={
@@ -114,15 +136,7 @@ def test_review_and_add_preserves_selected_meal_context() -> None:
 
 def test_future_review_and_add_can_create_planned_entry() -> None:
     profile_id = create_profile()
-    with patch("app.v081_capture.pytesseract.image_to_string", return_value="Energy 420 kJ"), patch(
-        "app.v081_capture.pytesseract.image_to_data",
-        return_value={"conf": ["90"]},
-    ):
-        upload = client.post(
-            "/api/v1/capture/nutrition-labels",
-            files=[("images", ("label.png", png_bytes(), "image/png"))],
-        )
-    upload_id = upload.json()["images"][0]["upload_id"]
+    upload_id = capture_images()["images"][0]["upload_id"]
     response = client.post(
         f"/api/v1/capture/nutrition-label/review-and-add?profile_id={profile_id}&day=2026-08-28&meal_period=dinner&mode=planned&servings=1.5",
         json={
@@ -142,3 +156,49 @@ def test_future_review_and_add_can_create_planned_entry() -> None:
     assert len(day["planned"]) == 1
     assert day["planned"][0]["meal_period"] == "dinner"
     assert day["planned"][0]["calories"] == 150
+
+
+def test_multi_image_files_are_removed_after_verified_save() -> None:
+    profile_id = create_profile()
+    capture = capture_images(2)
+    first, second = [item["upload_id"] for item in capture["images"]]
+    response = client.post(
+        f"/api/v1/capture/nutrition-label/review-and-add?profile_id={profile_id}&day=2026-08-26&meal_period=breakfast&mode=eaten&upload_ids={second}",
+        json={
+            "upload_id": first,
+            "name": "Captured Breakfast",
+            "kind": "food",
+            "serving_name": "1 serve",
+            "serving_unit": "serving",
+            "nutrition_basis": "per_serving",
+            "calories": 100,
+            "reviewed": True,
+        },
+    )
+    assert response.status_code == 201
+    assert client.get(f"/api/v1/capture/{first}/image").status_code == 404
+    assert client.get(f"/api/v1/capture/{second}/image").status_code == 404
+
+
+def test_captured_food_is_isolated_to_selected_profile_diary() -> None:
+    first_profile = create_profile("First Profile")
+    second_profile = create_profile("Second Profile")
+    upload_id = capture_images()["images"][0]["upload_id"]
+    response = client.post(
+        f"/api/v1/capture/nutrition-label/review-and-add?profile_id={first_profile}&day=2026-08-26&meal_period=breakfast&mode=eaten",
+        json={
+            "upload_id": upload_id,
+            "name": "Profile Food",
+            "kind": "food",
+            "serving_name": "1 serve",
+            "serving_unit": "serving",
+            "nutrition_basis": "per_serving",
+            "calories": 100,
+            "reviewed": True,
+        },
+    )
+    assert response.status_code == 201
+    first_day = client.get(f"/api/v1/profiles/{first_profile}/day-plan?day=2026-08-26").json()
+    second_day = client.get(f"/api/v1/profiles/{second_profile}/day-plan?day=2026-08-26").json()
+    assert len(first_day["consumed"]) == 1
+    assert second_day["consumed"] == []
