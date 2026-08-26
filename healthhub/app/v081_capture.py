@@ -3,7 +3,6 @@ from __future__ import annotations
 import io
 import logging
 from datetime import date, datetime, time, timezone
-from pathlib import Path
 from time import perf_counter
 from typing import Annotated, Any
 from uuid import uuid4
@@ -11,8 +10,8 @@ from zoneinfo import ZoneInfo
 
 import pytesseract  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .capture_sessions import CaptureImageResult, capture_response, merge_extractions
@@ -26,11 +25,10 @@ from .main import (
     local_barcode_food,
     save_reviewed_nutrition_label,
 )
-from .models import Food
 from .nutrition_capture import parse_nutrition_text
 from .planning import create_planned_entry
-from .planning_schemas import PlannedEntryCreate, PlannedEntryOutput
-from .schemas import DiaryEntryCreate, DiaryEntryOutput, FoodOutput, NutritionLabelReviewCreate
+from .planning_schemas import PlannedEntryCreate
+from .schemas import DiaryEntryCreate, FoodOutput, NutritionLabelReviewCreate
 
 router = APIRouter(prefix="/api/v1", tags=["capture"])
 DbSession = Annotated[Session, Depends(get_db)]
@@ -127,7 +125,7 @@ def review_and_add(
     meal_period: str = Query(...),
     mode: str = Query(default="eaten", pattern="^(eaten|planned)$"),
     servings: float = Query(default=1.0, gt=0, le=100),
-) -> Food:
+) -> FoodOutput:
     profile = get_profile_or_404(db, profile_id)
     if payload.barcode:
         existing = local_barcode_food(db, "".join(ch for ch in payload.barcode if ch.isdigit()))
@@ -162,12 +160,12 @@ def review_and_add(
             ),
             db,
         )
-    return food
+    return FoodOutput.model_validate(food)
 
 
-@router.get("/capture/{upload_id}/image")
-def capture_image_path(upload_id: str) -> Path:
+@router.get("/capture/{upload_id}/image", response_class=FileResponse)
+def capture_image(upload_id: str) -> FileResponse:
     matching = list(CAPTURE_DIR.glob(f"{upload_id}.*"))
     if not matching:
         raise HTTPException(status_code=404, detail="Capture image not found")
-    return matching[0]
+    return FileResponse(matching[0])
