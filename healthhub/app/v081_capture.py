@@ -41,6 +41,12 @@ def _overall_confidence(values: list[float]) -> str:
     return "high" if average >= 80 else "needs_review" if average >= 45 else "unknown"
 
 
+def _delete_capture_files(upload_ids: list[str]) -> None:
+    for upload_id in upload_ids:
+        for path in CAPTURE_DIR.glob(f"{upload_id}.*"):
+            path.unlink(missing_ok=True)
+
+
 async def _process_image(image: UploadFile) -> CaptureImageResult:
     started = perf_counter()
     if image.content_type not in ALLOWED_CAPTURE_TYPES:
@@ -104,8 +110,7 @@ async def upload_nutrition_labels(images: Annotated[list[UploadFile], File(...)]
         for image in images:
             processed.append(await _process_image(image))
     except HTTPException:
-        for item in processed:
-            item.image_path.unlink(missing_ok=True)
+        _delete_capture_files([item.upload_id for item in processed])
         raise
     result = merge_extractions(str(uuid4()), processed)
     logger.info(
@@ -125,8 +130,10 @@ def review_and_add(
     meal_period: str = Query(...),
     mode: str = Query(default="eaten", pattern="^(eaten|planned)$"),
     servings: float = Query(default=1.0, gt=0, le=100),
+    upload_ids: list[str] = Query(default=[]),
 ) -> FoodOutput:
     profile = get_profile_or_404(db, profile_id)
+    all_upload_ids = list(dict.fromkeys([payload.upload_id, *upload_ids]))
     if payload.barcode:
         existing = local_barcode_food(db, "".join(ch for ch in payload.barcode if ch.isdigit()))
         if existing is not None:
@@ -160,6 +167,7 @@ def review_and_add(
             ),
             db,
         )
+    _delete_capture_files(all_upload_ids)
     return FoodOutput.model_validate(food)
 
 
