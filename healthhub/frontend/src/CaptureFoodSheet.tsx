@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 const API = './api/v1'
 
@@ -66,6 +66,8 @@ export default function CaptureFoodSheet({
   const cameraRef = useRef<HTMLInputElement>(null)
   const uploadRef = useRef<HTMLInputElement>(null)
   const previews = useMemo(() => files.map((file) => ({ file, url: URL.createObjectURL(file) })), [files])
+
+  useEffect(() => () => previews.forEach((preview) => URL.revokeObjectURL(preview.url)), [previews])
 
   function appendFiles(items: FileList | null) {
     if (!items) return
@@ -147,6 +149,7 @@ export default function CaptureFoodSheet({
         reviewed: true,
       }
       const params = new URLSearchParams({ profile_id: profileId, day, meal_period: mealPeriod, mode, servings: String(servings) })
+      result.images.slice(1).forEach((image) => params.append('upload_ids', image.upload_id))
       const response = await fetch(`${API}/capture/nutrition-label/review-and-add?${params.toString()}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       })
