@@ -2,9 +2,34 @@
 
 HealthHub is a Home Assistant add-on for personal nutrition, calorie planning, activity goals and progress tracking, with a versioned integration to FoodHub.
 
-## Current development release: v0.8.0
+## Current development release: v0.8.1
 
-HealthHub v0.8.0 turns the Food Library and capture foundation into an everyday diary and planning workflow:
+HealthHub v0.8.1 is a corrective enhancement to the v0.8 Daily Diary. It brings the v0.7 image/barcode capture capability directly into the selected diary meal so adding food is not limited to search.
+
+Daily Diary **Add Food** now exposes:
+
+- Search
+- Scan Barcode
+- Take Photo
+- Upload Photo(s)
+
+The selected profile, date, meal section, planned/eaten state and serving quantity stay attached to the workflow. A verified captured food can be saved to the Food Library and added directly to that meal without searching for it again.
+
+### Multi-image nutrition capture
+
+Up to eight JPEG, PNG or WebP photos can form one capture session. Typical photos include the front of the product, Nutrition Information Panel, serving details and barcode/package information. HealthHub runs Tesseract OCR locally for every image, then deterministically merges useful fields into one review candidate. Higher-confidence values take precedence and equal-confidence conflicts are surfaced as warnings rather than silently overwritten.
+
+Users can preview selected photos, remove incorrect photos, add more photos and clear the capture before processing. OCR-derived values always require human verification before the food is committed.
+
+Temporary capture images are removed after the verified capture is saved. Source images are not sent to a third-party OCR provider.
+
+### Diary-aware barcode capture
+
+Barcode scanning is available from the same Add Food sheet. HealthHub checks the local Food Library first, then the configured product provider. Local matches can be added directly to the selected diary context. External matches require review before saving and adding. If browser camera scanning is unavailable, users can enter the barcode manually or use photo capture.
+
+## v0.8 Daily Diary and planning
+
+HealthHub v0.8.0 turned the Food Library and capture foundation into an everyday diary and planning workflow:
 
 - selected-date Daily Diary with Breakfast, Morning Snack, Lunch, Afternoon Snack, Dinner, Evening Snack and Drinks sections
 - clear Daily Goal, Eaten, Planned and Remaining-after-planned calorie budget
@@ -36,13 +61,13 @@ Future copies of foods, meals and complete days are created as Planned by defaul
 
 Quick Add ranks profile-specific favourites, frequent foods and recent foods ahead of general Food Library results. When the user types a query, HealthHub local search returns first. FoodHub recipe lookup is a separate cancellable request and is merged into the visible results when available.
 
-A slow or unavailable FoodHub service therefore does not block local foods.
+A slow or unavailable FoodHub service therefore does not block local foods. Image OCR is also local-first and does not depend on FoodHub or the external product provider.
 
 ## Weekly planning and responsiveness
 
 The Week planner provides immediate `Adding…` feedback and disables the in-flight submission to prevent duplicate clicks. One-off additions use the newly created planned-entry response to update the visible week rather than blocking on a complete week reload.
 
-The weekly summary now loads the requested week's planned entries in one range query and consumed diary entries in one range query, replacing the previous per-day query loop. Recurrence materialisation fetches existing occurrences once for the materialisation range instead of performing one existence query for every candidate date.
+The weekly summary loads the requested week's planned entries in one range query and consumed diary entries in one range query, replacing the previous per-day query loop. Recurrence materialisation fetches existing occurrences once for the materialisation range instead of performing one existence query for every candidate date.
 
 ## Reusable meals
 
@@ -54,21 +79,24 @@ HealthHub communicates with FoodHub only through versioned `/api/v1` interfaces 
 
 FoodHub remains authoritative for recipe identity and current recipe nutrition. When a FoodHub recipe is selected for planning or logging, HealthHub synchronises an authoritative local recipe representation and snapshots the selected nutrition into the diary or plan. Later FoodHub changes apply to future selections only.
 
-Repeated v0.8 FoodHub searches use a pooled HTTP client with keep-alive and application shutdown cleanup. Optional FoodHub failure does not block local HealthHub search or planning.
+Repeated FoodHub searches use a pooled HTTP client with keep-alive and application shutdown cleanup. Optional FoodHub failure does not block local HealthHub search, image capture or planning.
 
 ## Import, barcode and nutrition-label capture
 
-The v0.7 capabilities remain available:
+HealthHub supports:
 
 - spreadsheet paste, CSV and XLSX import through validation and duplicate preview
 - local-first barcode identity and external product lookup
+- phone camera capture and existing-photo upload from Daily Diary Quick Add
+- multiple product/label photos in one capture session
 - local Tesseract OCR for JPEG, PNG and WebP nutrition labels
 - mandatory human review before OCR-derived nutrition is saved
+- direct Save & Add to the selected diary meal or future plan
 - nutrition provenance and source-precedence protection
 
 ## Architecture and data safety
 
-HealthHub keeps its own SQLite datastore and Alembic migrations. SQLite uses WAL mode and existing profile/date indexes. v0.8 adds migration `0008_saved_meals`; it does not reset or recreate the database.
+HealthHub keeps its own SQLite datastore and Alembic migrations. SQLite uses WAL mode and existing profile/date indexes. v0.8 adds migration `0008_saved_meals`; v0.8.1 requires no database migration and does not reset or recreate the database.
 
 Production data lives under `/data/healthhub`. Home Assistant Ingress remains the default access path.
 
@@ -102,4 +130,4 @@ Full preflight:
 
 ## Roadmap
 
-A sensible next release is exercise and progress integration around the new daily calorie budget, followed by richer saved-meal management, optional macro targets and deeper FoodHub recipe/serving workflows. Wearables, smart-scale integrations and meal-photo calorie estimation remain later work.
+A sensible next release is richer saved-meal management, optional macro targets and deeper FoodHub recipe/serving workflows. Wearables, smart-scale integrations and meal-photo calorie estimation remain later work.
