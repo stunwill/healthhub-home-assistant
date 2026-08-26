@@ -8,8 +8,9 @@ from .activity import router as activity_router
 from .main import app
 from .planning import router as planning_router
 from .v08 import close_foodhub_client, router as v08_router
+from .v081_capture import router as v081_capture_router
 
-RUNTIME_VERSION = os.getenv("HEALTHHUB_VERSION", "0.8.0")
+RUNTIME_VERSION = os.getenv("HEALTHHUB_VERSION", "0.8.1")
 main_module.APP_VERSION = RUNTIME_VERSION
 app.version = RUNTIME_VERSION
 
@@ -33,6 +34,7 @@ if frontend_fallback is not None:
 app.include_router(activity_router)
 app.include_router(planning_router)
 app.include_router(v08_router)
+app.include_router(v081_capture_router)
 
 if frontend_fallback is not None:
     app.router.routes.append(frontend_fallback)
