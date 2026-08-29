@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  validate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CONFIG_VERSION="$(sed -n 's/^version: "\(.*\)"/\1/p' healthhub/config.yaml)"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${VERSION}" != "${CONFIG_VERSION}" ]]; then
+            echo "Tag ${VERSION} does not match config.yaml ${CONFIG_VERSION}" >&2
+            exit 1
+          fi
+          echo "version=${CONFIG_VERSION}" >> "${GITHUB_OUTPUT}"
+
+  github-release:
+    if: github.ref_type == 'tag'
+    needs: validate-version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare current release notes
+        shell: bash
+        run: |
+          VERSION="${{ needs.validate-version.outputs.version }}"
+          awk -v version="$VERSION" '
+            $0 ~ "^## " version "([[:space:]]|$)" {found=1; print; next}
+            found && $0 ~ "^## " {exit}
+            found {print}
+          ' CHANGELOG.md > RELEASE_NOTES.md
+          test -s RELEASE_NOTES.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: RELEASE_NOTES.md
