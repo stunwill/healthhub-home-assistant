@@ -100,6 +100,20 @@ HealthHub keeps its own SQLite datastore and Alembic migrations. SQLite uses WAL
 
 Production data lives under `/data/healthhub`. Home Assistant Ingress remains the default access path.
 
+## DevHub release metadata
+
+DevHub-compatible repository metadata is intentionally exposed in stable locations:
+
+- `ROADMAP.md` is the canonical product roadmap and phase/status source.
+- `CHANGELOG.md` is the detailed repository/product release history.
+- `healthhub/CHANGELOG.md` contains concise Home Assistant-facing release notes.
+- `healthhub/config.yaml` is the authoritative Home Assistant application version.
+- `healthhub/frontend/package.json`, the backend `APP_VERSION` fallback and `healthhub/Dockerfile` are kept aligned with that version.
+- `/api/v1/health` and `/api/v1/version` expose the runtime application version.
+- semantic Git tags and GitHub Releases use the matching `vX.Y.Z` form.
+
+CI validates these metadata sources so version drift or missing release metadata is caught before merge.
+
 ## Development
 
 Backend:
@@ -130,4 +144,4 @@ Full preflight:
 
 ## Roadmap
 
-A sensible next release is richer saved-meal management, optional macro targets and deeper FoodHub recipe/serving workflows. Wearables, smart-scale integrations and meal-photo calorie estimation remain later work.
+See [`ROADMAP.md`](ROADMAP.md) for delivered, planned and future HealthHub work.
