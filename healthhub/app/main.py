@@ -51,7 +51,7 @@ from .schemas import (
     QuickAddResult,
 )
 
-APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.7.0")
+APP_VERSION = os.getenv("HEALTHHUB_VERSION", "0.8.1")
 STATIC_DIR = Path(os.getenv("HEALTHHUB_STATIC_DIR", "/app/static"))
 OPTIONS_FILE = Path("/data/options.json")
 ACTIVE_PROFILE_FILE = Path(os.getenv("HEALTHHUB_ACTIVE_PROFILE_FILE", "/data/healthhub/active-profile.json"))

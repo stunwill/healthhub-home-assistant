@@ -12,6 +12,70 @@ permissions:
   contents: read
 
 jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate DevHub metadata and version consistency
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          required = [Path('ROADMAP.md'), Path('CHANGELOG.md'), Path('healthhub/CHANGELOG.md')]
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit(f'Missing required metadata: {", ".join(missing)}')
+
+          config = Path('healthhub/config.yaml').read_text(encoding='utf-8')
+          match = re.search(r'^version:\s*["\']?([^"\'\s]+)', config, re.MULTILINE)
+          if not match:
+              raise SystemExit('Could not determine version from healthhub/config.yaml')
+          version = match.group(1)
+          if not re.fullmatch(r'\d+\.\d+\.\d+', version):
+              raise SystemExit(f'HealthHub version is not semantic: {version}')
+
+          frontend = json.loads(Path('healthhub/frontend/package.json').read_text(encoding='utf-8'))['version']
+          main = Path('healthhub/app/main.py').read_text(encoding='utf-8')
+          backend_match = re.search(r'APP_VERSION\s*=\s*os\.getenv\("HEALTHHUB_VERSION",\s*"([^"]+)"\)', main)
+          if not backend_match:
+              raise SystemExit('Could not determine backend APP_VERSION fallback')
+          backend = backend_match.group(1)
+          docker = Path('healthhub/Dockerfile').read_text(encoding='utf-8')
+          docker_match = re.search(r'^ARG BUILD_VERSION=([^\s]+)', docker, re.MULTILINE)
+          if not docker_match:
+              raise SystemExit('Could not determine Docker BUILD_VERSION')
+          docker_version = docker_match.group(1)
+
+          versions = {
+              'config.yaml': version,
+              'frontend/package.json': frontend,
+              'backend APP_VERSION': backend,
+              'Dockerfile': docker_version,
+          }
+          drift = {source: value for source, value in versions.items() if value != version}
+          if drift:
+              raise SystemExit(f'Version drift detected: authoritative={version}, mismatches={drift}')
+
+          root_changelog = Path('CHANGELOG.md').read_text(encoding='utf-8')
+          ha_changelog = Path('healthhub/CHANGELOG.md').read_text(encoding='utf-8')
+          if not re.search(rf'^##\s+(?:v)?{re.escape(version)}(?:\s|$)', root_changelog, re.MULTILINE):
+              raise SystemExit(f'Root CHANGELOG.md does not contain release {version}')
+          if not re.search(rf'^##\s+(?:v)?{re.escape(version)}(?:\s|$)', ha_changelog, re.MULTILINE):
+              raise SystemExit(f'healthhub/CHANGELOG.md does not contain release {version}')
+
+          roadmap = Path('ROADMAP.md').read_text(encoding='utf-8')
+          if '# HealthHub Roadmap' not in roadmap or 'Status:' not in roadmap or '## Future' not in roadmap:
+              raise SystemExit('ROADMAP.md is missing DevHub-friendly structure')
+
+          if '@app.get("/api/v1/health")' not in main or '"version": APP_VERSION' not in main:
+              raise SystemExit('/api/v1/health must expose APP_VERSION')
+          PY
+
   backend:
     runs-on: ubuntu-latest
     defaults:
